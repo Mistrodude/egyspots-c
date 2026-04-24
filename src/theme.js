@@ -15,6 +15,14 @@ export const DARK = {
   shadow:    '0 2px 16px rgba(0,0,0,0.5)',
   shadow2:   '0 8px 32px rgba(0,0,0,0.7)',
   overlay:   'rgba(13,11,20,0.85)',
+  success:   '#4A9E6B',
+  successBg: 'rgba(74,158,107,0.15)',
+  error:     '#D06A50',
+  errorBg:   'rgba(208,106,80,0.12)',
+  warning:   '#C8A96E',
+  warningBg: 'rgba(200,169,110,0.15)',
+  gold:      '#F4C430',
+  goldBg:    'rgba(244,196,48,0.15)',
   crowd: { Chill: '#4A9E6B', Lively: '#C8A96E', Packed: '#D06A50' },
 };
 
@@ -35,5 +43,13 @@ export const LIGHT = {
   shadow:    '0 2px 16px rgba(0,0,0,0.08)',
   shadow2:   '0 8px 32px rgba(0,0,0,0.12)',
   overlay:   'rgba(250,247,242,0.85)',
+  success:   '#3D8E5E',
+  successBg: 'rgba(61,142,94,0.12)',
+  error:     '#C0503A',
+  errorBg:   'rgba(192,80,58,0.10)',
+  warning:   '#9A7A4A',
+  warningBg: 'rgba(154,122,74,0.12)',
+  gold:      '#C8A030',
+  goldBg:    'rgba(200,160,48,0.12)',
   crowd: { Chill: '#6CBF8E', Lively: '#C8A96E', Packed: '#E07A5F' },
 };

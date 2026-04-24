@@ -6,35 +6,83 @@ import {
   signInWithPopup,
   signOut,
   updateProfile,
+  sendEmailVerification,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  doc, setDoc, getDoc, updateDoc, serverTimestamp, query,
+  collection, where, getDocs, limit,
+} from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser]       = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user,        setUser]        = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
+  const [loading,     setLoading]     = useState(true);
+
+  const loadProfile = async (uid) => {
+    try {
+      const snap = await getDoc(doc(db, 'users', uid));
+      return snap.exists() ? snap.data() : null;
+    } catch (_) { return null; }
+  };
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Ensure Firestore profile exists
-        const ref = doc(db, 'users', firebaseUser.uid);
-        const snap = await getDoc(ref);
-        if (!snap.exists()) {
-          await setDoc(ref, {
-            uid:         firebaseUser.uid,
-            email:       firebaseUser.email,
-            displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
-            photoURL:    firebaseUser.photoURL || null,
-            checkins:    0,
-            createdAt:   serverTimestamp(),
-          });
+        const profile = await loadProfile(firebaseUser.uid);
+
+        // Hard block banned users
+        if (profile?.isBanned) {
+          await signOut(auth);
+          setUser(null);
+          setUserProfile({ isBanned: true, banReason: profile.banReason });
+          setLoading(false);
+          return;
         }
-        setUser({ ...firebaseUser, profile: snap.data() || {} });
+
+        // Auto-create profile if Google sign-in and no Firestore doc yet
+        if (!profile) {
+          const newProfile = {
+            uid:              firebaseUser.uid,
+            email:            firebaseUser.email,
+            displayName:      firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+            username:         null,
+            phoneNumber:      null,
+            role:             'user',
+            gender:           null,
+            birthDate:        null,
+            age:              null,
+            profilePhotoURL:  firebaseUser.photoURL || null,
+            bio:              '',
+            city:             'Cairo',
+            language:         'ar',
+            isVerified:       firebaseUser.emailVerified,
+            isBanned:         false,
+            banReason:        null,
+            totalCheckins:    0,
+            notifSettings: {
+              checkinLikes:  true,
+              newSpotNearby: true,
+            },
+            createdAt:  serverTimestamp(),
+            lastLoginAt: serverTimestamp(),
+          };
+          await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
+          setUserProfile(newProfile);
+        } else {
+          // Update lastLoginAt
+          updateDoc(doc(db, 'users', firebaseUser.uid), {
+            lastLoginAt:  serverTimestamp(),
+            isVerified:   firebaseUser.emailVerified,
+          }).catch(() => {});
+          setUserProfile(profile);
+        }
+        setUser(firebaseUser);
       } else {
         setUser(null);
+        setUserProfile(null);
       }
       setLoading(false);
     });
@@ -44,17 +92,50 @@ export function AuthProvider({ children }) {
   const signIn = (email, password) =>
     signInWithEmailAndPassword(auth, email, password);
 
-  const signUp = async (email, password, name) => {
+  const signUp = async (email, password, userData) => {
+    const {
+      displayName, username, phoneNumber, birthDate, gender,
+      city = 'Cairo', language = 'ar',
+    } = userData;
+
     const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(cred.user, { displayName: name });
-    await setDoc(doc(db, 'users', cred.user.uid), {
-      uid:         cred.user.uid,
+    await updateProfile(cred.user, { displayName });
+
+    const age = birthDate
+      ? Math.floor((Date.now() - new Date(birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+      : null;
+
+    const profile = {
+      uid:              cred.user.uid,
       email,
-      displayName: name,
-      photoURL:    null,
-      checkins:    0,
+      displayName,
+      username:         username?.toLowerCase() || null,
+      phoneNumber:      phoneNumber || null,
+      role:             'user',
+      gender:           gender || null,
+      birthDate:        birthDate ? new Date(birthDate) : null,
+      age,
+      profilePhotoURL:  null,
+      bio:              '',
+      city,
+      language,
+      isVerified:       false,
+      isBanned:         false,
+      banReason:        null,
+      totalCheckins:    0,
+      notifSettings: {
+        checkinLikes:  true,
+        newSpotNearby: true,
+      },
       createdAt:   serverTimestamp(),
-    });
+      lastLoginAt: serverTimestamp(),
+    };
+
+    await setDoc(doc(db, 'users', cred.user.uid), profile);
+
+    // Send email verification
+    try { await sendEmailVerification(cred.user); } catch (_) {}
+
     return cred;
   };
 
@@ -62,8 +143,50 @@ export function AuthProvider({ children }) {
 
   const logOut = () => signOut(auth);
 
+  const checkUsernameAvailable = async (username) => {
+    if (!username || username.length < 3) return false;
+    try {
+      const q = query(
+        collection(db, 'users'),
+        where('username', '==', username.toLowerCase()),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      return snap.empty;
+    } catch (_) { return true; }
+  };
+
+  const updateUserProfile = async (data) => {
+    if (!user) return;
+    await updateDoc(doc(db, 'users', user.uid), {
+      ...data,
+      updatedAt: serverTimestamp(),
+    });
+    const fresh = await loadProfile(user.uid);
+    setUserProfile(fresh);
+  };
+
+  const refreshProfile = async () => {
+    if (!user) return;
+    const fresh = await loadProfile(user.uid);
+    setUserProfile(fresh);
+  };
+
+  const signInApple = async () => {
+    const { OAuthProvider, signInWithPopup: signinPopup } = await import('firebase/auth');
+    const provider = new OAuthProvider('apple.com');
+    provider.addScope('email');
+    provider.addScope('name');
+    const result = await signinPopup(auth, provider);
+    return result;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signInGoogle, logOut }}>
+    <AuthContext.Provider value={{
+      user, userProfile, loading,
+      signIn, signUp, signInGoogle, signInApple, logOut,
+      checkUsernameAvailable, updateUserProfile, refreshProfile,
+    }}>
       {children}
     </AuthContext.Provider>
   );

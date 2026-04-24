@@ -1,51 +1,30 @@
 import { describe, it, expect } from 'vitest';
-import { SPOTS_SEED, CATEGORIES, filterSpots } from '../data/spots';
+import { SPOTS_SEED, CATEGORIES, filterSpots, SPOT_TAGS } from '../data/spots';
 
-describe('filterSpots', () => {
-  it('returns all spots for "All"', () => {
-    const result = filterSpots(SPOTS_SEED, 'All');
-    expect(result).toHaveLength(SPOTS_SEED.length);
+describe('spots data', () => {
+  it('has correct categories including All', () => {
+    expect(CATEGORIES).toEqual(['All', 'Street Cart', 'Car Meet', 'Hangout', 'Pop-Up', 'Open Air']);
   });
 
-  it('filters to cafes only', () => {
-    const result = filterSpots(SPOTS_SEED, 'Cafes');
-    expect(result.length).toBeGreaterThan(0);
-    result.forEach((s) => expect(s.category).toBe('Cafe'));
+  it('all seed spots use new category values', () => {
+    const valid = ['street_cart', 'car_meet', 'hangout', 'pop_up', 'open_air'];
+    SPOTS_SEED.forEach((s) => expect(valid).toContain(s.category));
   });
 
-  it('filters to street food only', () => {
-    const result = filterSpots(SPOTS_SEED, 'Street Food');
-    expect(result.length).toBeGreaterThan(0);
-    result.forEach((s) => expect(s.category).toBe('Street Food'));
+  it('all seed spots have a founder', () => {
+    SPOTS_SEED.forEach((s) => {
+      expect(s.founderId).toBeTruthy();
+      expect(s.founderName).toBeTruthy();
+    });
   });
 
-  it('filters to shisha spots (by vibe)', () => {
-    const result = filterSpots(SPOTS_SEED, 'Shisha');
-    result.forEach((s) => expect(s.vibe).toContain('Shisha'));
-  });
-
-  it('filters to car meets only', () => {
-    const result = filterSpots(SPOTS_SEED, 'Car Meets');
-    expect(result.length).toBeGreaterThan(0);
-    result.forEach((s) => expect(s.category).toBe('Car Meet'));
-  });
-
-  it('filters to parks only', () => {
-    const result = filterSpots(SPOTS_SEED, 'Parks');
-    expect(result.length).toBeGreaterThan(0);
-    result.forEach((s) => expect(s.category).toBe('Park'));
-  });
-
-  it('filters to open air only', () => {
-    const result = filterSpots(SPOTS_SEED, 'Open Air');
-    expect(result.length).toBeGreaterThan(0);
-    result.forEach((s) => expect(s.category).toBe('Open Air'));
-  });
-
-  it('CATEGORIES array contains expected values', () => {
-    expect(CATEGORIES).toContain('All');
-    expect(CATEGORIES).toContain('Cafes');
-    expect(CATEGORIES).toContain('Street Food');
+  it('all seed spots have valid Cairo coordinates', () => {
+    SPOTS_SEED.forEach((s) => {
+      expect(s.lat).toBeGreaterThan(29);
+      expect(s.lat).toBeLessThan(31);
+      expect(s.lng).toBeGreaterThan(30);
+      expect(s.lng).toBeLessThan(32);
+    });
   });
 
   it('all seed spots have required fields', () => {
@@ -55,8 +34,36 @@ describe('filterSpots', () => {
       expect(s).toHaveProperty('lat');
       expect(s).toHaveProperty('lng');
       expect(s).toHaveProperty('crowdPct');
+      expect(s).toHaveProperty('crowd');
       expect(s.crowdPct).toBeGreaterThanOrEqual(0);
       expect(s.crowdPct).toBeLessThanOrEqual(100);
     });
+  });
+
+  it('tags are from allowed list', () => {
+    SPOTS_SEED.forEach((s) => {
+      s.tags.forEach((tag) => expect(SPOT_TAGS).toContain(tag));
+    });
+  });
+
+  it('filterSpots returns all on "All"', () => {
+    expect(filterSpots(SPOTS_SEED, 'All')).toEqual(SPOTS_SEED);
+  });
+
+  it('filterSpots filters by Hangout', () => {
+    const result = filterSpots(SPOTS_SEED, 'Hangout');
+    expect(result.length).toBeGreaterThan(0);
+    result.forEach((s) => expect(s.category).toBe('hangout'));
+  });
+
+  it('filterSpots filters by Car Meet', () => {
+    const result = filterSpots(SPOTS_SEED, 'Car Meet');
+    expect(result.length).toBeGreaterThan(0);
+    result.forEach((s) => expect(s.category).toBe('car_meet'));
+  });
+
+  it('no seed spot uses removed categories', () => {
+    const removed = ['Cafe', 'Traditional', 'coffee', 'food', 'Coffee', 'Food'];
+    SPOTS_SEED.forEach((s) => expect(removed).not.toContain(s.category));
   });
 });

@@ -16,11 +16,20 @@ function SpotCard({ spot, onPress, checkedIn }) {
       }}
     >
       <div style={{
-        width: 42, height: 42, borderRadius: 13,
-        background: spot.color + '18',
+        width: 72, height: 56, borderRadius: 12, overflow: 'hidden',
+        background: `linear-gradient(135deg, ${spot.color}33, ${spot.color}66)`,
         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        border: `1px solid ${t.border}`,
       }}>
-        <SpotIcon category={spot.category} color={spot.color} size={20} />
+        {spot.coverPhotoURL ? (
+          <img
+            src={spot.coverPhotoURL}
+            alt={spot.name}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : (
+          <SpotIcon category={spot.category} color={spot.color} size={20} />
+        )}
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>

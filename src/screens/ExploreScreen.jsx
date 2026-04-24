@@ -57,7 +57,7 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch }) {
       </div>
 
       {/* Search bar */}
-      <div style={{ position: 'absolute', top: 62, left: 14, right: 14, zIndex: 20 }}>
+      <div style={{ position: 'absolute', top: 62, left: 14, right: 14, zIndex: 1200 }}>
         <button
           type="button"
           onClick={onOpenSearch}
@@ -96,7 +96,7 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch }) {
       <div style={{
         position: 'absolute', right: 14,
         bottom: sheetOpen ? 'calc(68% + 14px)' : PEEK_H + 14,
-        zIndex: 20, display: 'flex', flexDirection: 'column', gap: 8,
+        zIndex: 1200, display: 'flex', flexDirection: 'column', gap: 8,
         transition: 'bottom 0.4s cubic-bezier(.32,1,.36,1)',
       }}>
         <button onClick={handleLocate} style={{
@@ -131,7 +131,7 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch }) {
       <div style={{
         position: 'absolute', left: 14,
         bottom: sheetOpen ? 'calc(68% + 14px)' : PEEK_H + 14,
-        zIndex: 20,
+        zIndex: 1200,
         transition: 'bottom 0.4s cubic-bezier(.32,1,.36,1)',
         background: 'rgba(208,106,80,0.9)',
         backdropFilter: 'blur(8px)',
@@ -144,7 +144,7 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch }) {
 
       {/* Bottom sheet */}
       <div style={{
-        position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 30,
+        position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 1300,
         height: sheetOpen ? '68%' : PEEK_H,
         transition: 'height 0.4s cubic-bezier(.32,1,.36,1)',
         display: 'flex', flexDirection: 'column',

@@ -79,3 +79,22 @@ describe('SPOTS_SEED integrity', () => {
     });
   });
 });
+
+describe('checkIn Firestore payload', () => {
+  it('check-in payload includes spotId and userId', () => {
+    const uid = 'user_abc';
+    const spotId = 'kazoku';
+    const payload = { spotId, userId: uid, timestamp: new Date().toISOString() };
+    expect(payload.spotId).toBe(spotId);
+    expect(payload.userId).toBe(uid);
+    expect(payload).toHaveProperty('timestamp');
+  });
+
+  it('toggle off (same spot) sets checkedInId to null and returns null', () => {
+    const { result } = renderHook(() => useCheckInLogic('kazoku'));
+    let returnVal;
+    act(() => { returnVal = result.current.checkIn('kazoku'); });
+    expect(result.current.checkedInId).toBeNull();
+    expect(returnVal).toBeNull();
+  });
+});

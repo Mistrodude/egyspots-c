@@ -17,12 +17,15 @@ vi.mock('../context/ThemeContext', () => ({
 const mockSignIn       = vi.fn();
 const mockSignUp       = vi.fn();
 const mockSignInGoogle = vi.fn();
+const mockSignInApple  = vi.fn();
 
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({
     signIn:       mockSignIn,
     signUp:       mockSignUp,
     signInGoogle: mockSignInGoogle,
+    signInApple:  mockSignInApple,
+    checkUsernameAvailable: vi.fn().mockResolvedValue(true),
   }),
 }));
 
@@ -129,5 +132,20 @@ describe('AuthScreen', () => {
     );
     fireEvent.click(signUpTab);
     expect(screen.queryByText('Forgot password?')).not.toBeInTheDocument();
+  });
+
+  it('shows Sign in with Apple button', () => {
+    render(<AuthScreen onBack={vi.fn()} />);
+    expect(screen.getByText(/Sign in with Apple/i)).toBeInTheDocument();
+  });
+
+  it('calls signInApple when Apple button clicked', async () => {
+    mockSignInApple.mockResolvedValueOnce({});
+    render(<AuthScreen onBack={vi.fn()} />);
+    const appleBtn = screen.getByText(/Sign in with Apple/i).closest('button');
+    fireEvent.click(appleBtn);
+    await waitFor(() => {
+      expect(mockSignInApple).toHaveBeenCalled();
+    });
   });
 });

@@ -1,151 +1,120 @@
-import { useEffect, useRef, useCallback } from 'react';
-import mapboxgl from 'mapbox-gl';
+import { useEffect, useRef } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { useTheme } from '../context/ThemeContext';
-
-mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
+import { useStories } from '../context/StoriesContext';
 
 const CAIRO_CENTER = [31.2357, 30.0444];
 
 export default function MapView({ spots, selectedId, onSpotPress, checkedInId, flyToTarget }) {
   const { isDark } = useTheme();
-  const containerRef  = useRef(null);
-  const mapRef        = useRef(null);
-  const markersRef    = useRef({});
-  const mapLoadedRef  = useRef(false);
+  const { storiesBySpot } = useStories();
+  const containerRef = useRef(null);
+  const mapRef = useRef(null);
+  const markerLayerRef = useRef(null);
+  const userMarkerRef = useRef(null);
+  const userPulseRef = useRef(null);
 
-  const removeAllMarkers = useCallback(() => {
-    Object.values(markersRef.current).forEach((m) => m.remove());
-    markersRef.current = {};
-  }, []);
-
-  const addMarkers = useCallback((map, spotsArr, selId, checkinId) => {
-    removeAllMarkers();
-    spotsArr.forEach((spot) => {
-      const isSelected  = spot.id === selId;
-      const isCheckedIn = spot.id === checkinId;
-
-      const el = document.createElement('div');
-      el.style.cssText = `
-        width:${isSelected ? 18 : 12}px;
-        height:${isSelected ? 18 : 12}px;
-        border-radius:50%;
-        background:${isDark ? '#A78BFA' : spot.color};
-        border:2px solid ${isDark ? '#0D0B14' : '#fff'};
-        box-shadow:0 0 ${isSelected ? '12px 4px' : '6px 0px'} ${isDark ? '#A78BFA' : spot.color}66;
-        cursor:pointer;
-        transition:all 0.2s;
-      `;
-
-      if (isCheckedIn) {
-        el.style.animation = 'pulse 1.8s infinite';
-        el.style.background = '#A78BFA';
-      }
-
-      el.addEventListener('click', (e) => {
-        e.stopPropagation();
-        onSpotPress(spot);
-      });
-
-      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
-        .setLngLat([spot.lng, spot.lat])
-        .addTo(map);
-
-      markersRef.current[spot.id] = marker;
-    });
-  }, [isDark, onSpotPress, removeAllMarkers]);
-
-  const buildHeatFeatures = (spotsArr) => ({
-    type: 'FeatureCollection',
-    features: spotsArr.map((s) => ({
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
-      properties: { crowdPct: s.crowdPct },
-    })),
-  });
-
-  // Initialise map once
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-
-    const map = new mapboxgl.Map({
-      container: containerRef.current,
-      style: isDark
-        ? 'mapbox://styles/mapbox/dark-v11'
-        : 'mapbox://styles/mapbox/light-v11',
-      center: CAIRO_CENTER,
+    const map = L.map(containerRef.current, {
+      center: [CAIRO_CENTER[1], CAIRO_CENTER[0]],
       zoom: 11.5,
-      pitch: 20,
+      zoomControl: false,
+      preferCanvas: true,
     });
 
-    map.on('load', () => {
-      mapLoadedRef.current = true;
+    L.tileLayer(
+      isDark
+        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+        : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      { maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO' }
+    ).addTo(map);
 
-      map.addSource('spots-heat', {
-        type: 'geojson',
-        data: buildHeatFeatures(spots),
-      });
-
-      map.addLayer({
-        id: 'spots-heatmap',
-        type: 'heatmap',
-        source: 'spots-heat',
-        paint: {
-          'heatmap-weight':    ['interpolate', ['linear'], ['get', 'crowdPct'], 0, 0, 100, 1],
-          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 10, 0.6, 15, 1.5],
-          'heatmap-color': [
-            'interpolate', ['linear'], ['heatmap-density'],
-            0,   'rgba(0,0,0,0)',
-            0.2, isDark ? 'rgba(74,158,107,0.5)'  : 'rgba(74,158,107,0.4)',
-            0.5, isDark ? 'rgba(200,169,110,0.7)'  : 'rgba(200,169,110,0.6)',
-            0.8, isDark ? 'rgba(208,106,80,0.85)'  : 'rgba(208,106,80,0.75)',
-            1,   isDark ? 'rgba(255,69,0,0.9)'     : 'rgba(255,69,0,0.8)',
-          ],
-          'heatmap-radius':  ['interpolate', ['linear'], ['zoom'], 10, 20, 14, 50],
-          'heatmap-opacity': 0.8,
-        },
-      });
-
-      addMarkers(map, spots, selectedId, checkedInId);
-    });
+    markerLayerRef.current = L.layerGroup().addTo(map);
 
     mapRef.current = map;
     return () => {
-      mapLoadedRef.current = false;
       map.remove();
       mapRef.current = null;
-      removeAllMarkers();
+      markerLayerRef.current = null;
+      userMarkerRef.current = null;
+      userPulseRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // only once
+  }, [isDark]);
 
-  // Update heatmap source data reactively when spots change
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapLoadedRef.current) return;
-    const source = map.getSource('spots-heat');
-    if (source) source.setData(buildHeatFeatures(spots));
-  }, [spots]);
+    const layer = markerLayerRef.current;
+    if (!map || !layer) return;
 
-  // Update markers when spots/selection/checkin change
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    addMarkers(map, spots, selectedId, checkedInId);
-  }, [spots, selectedId, checkedInId, addMarkers]);
+    layer.clearLayers();
 
-  // Fly to selected spot
+    spots.forEach((spot) => {
+      const isSelected = spot.id === selectedId;
+      const isCheckedIn = spot.id === checkedInId;
+      const hasStories = (storiesBySpot[spot.id]?.length || 0) > 0;
+      const radius = isSelected ? 11 : 8;
+      const fill = isCheckedIn ? '#A78BFA' : (isDark ? '#A78BFA' : spot.color);
+
+      // Heat-like halo
+      L.circle([spot.lat, spot.lng], {
+        radius: Math.max(40, (spot.crowdPct || 30) * 7),
+        stroke: false,
+        fillColor: fill,
+        fillOpacity: 0.09,
+        interactive: false,
+      }).addTo(layer);
+
+      // Gold story ring if spot has active stories
+      if (hasStories) {
+        L.circleMarker([spot.lat, spot.lng], {
+          radius: radius + 5,
+          color: '#C8A96E',
+          weight: 2,
+          fillColor: 'transparent',
+          fillOpacity: 0,
+          interactive: false,
+        }).addTo(layer);
+      }
+
+      L.circleMarker([spot.lat, spot.lng], {
+        radius,
+        color: '#ffffff',
+        weight: isSelected ? 3 : 2,
+        fillColor: fill,
+        fillOpacity: 1,
+      }).on('click', () => onSpotPress(spot)).addTo(layer);
+    });
+  }, [spots, selectedId, checkedInId, onSpotPress, isDark, storiesBySpot]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !selectedId) return;
     const spot = spots.find((s) => s.id === selectedId);
-    if (spot) map.flyTo({ center: [spot.lng, spot.lat], zoom: 14, duration: 800 });
+    if (spot) map.flyTo([spot.lat, spot.lng], 14, { duration: 0.8 });
   }, [selectedId, spots]);
 
-  // Fly to user's location when Find Me is triggered
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !flyToTarget) return;
-    map.flyTo({ center: [flyToTarget.lng, flyToTarget.lat], zoom: 15, duration: 1200 });
+    if (userMarkerRef.current) map.removeLayer(userMarkerRef.current);
+    if (userPulseRef.current) map.removeLayer(userPulseRef.current);
+    userMarkerRef.current = L.circleMarker([flyToTarget.lat, flyToTarget.lng], {
+      radius: 7,
+      color: '#ffffff',
+      weight: 2,
+      fillColor: '#3B82F6',
+      fillOpacity: 1,
+    }).addTo(map);
+    userPulseRef.current = L.circle([flyToTarget.lat, flyToTarget.lng], {
+      radius: 120,
+      stroke: false,
+      fillColor: '#3B82F6',
+      fillOpacity: 0.12,
+      interactive: false,
+    }).addTo(map);
+    map.flyTo([flyToTarget.lat, flyToTarget.lng], 15, { duration: 1.2 });
   }, [flyToTarget]);
 
   return (

@@ -2,42 +2,85 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Spots: anyone can read; checkins counter can be updated by any auth user;
-    // full writes (admin only via custom claims or service account)
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() { return isSignedIn() && request.auth.token.admin == true; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function onlyKeys(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    // Spots: public read; any signed-in user can create; limited update; admin full write
     match /spots/{spotId} {
       allow read: if true;
-      allow update: if request.auth != null
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkins']);
-      allow write: if request.auth != null && request.auth.token.admin == true;
+      allow create: if isSignedIn()
+        && request.resource.data.founderId == request.auth.uid;
+      allow update: if isAdmin()
+        || (isSignedIn() && onlyKeys(['checkins', 'totalCheckins', 'checkinsToday', 'weeklyCheckins']));
+      allow delete: if isAdmin();
     }
 
-    // Users: each user can only read and write their own document
+    // Users: owner or admin only
     match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read, write: if isOwner(uid) || isAdmin();
     }
 
-    // Messages: anyone can read; authenticated users can create their own messages
+    // Messages: public read; auth users create own; owner delete
     match /messages/{messageId} {
       allow read: if true;
-      allow create: if request.auth != null
+      allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 500;
-      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
-    // Reviews: anyone can read; authenticated users can create one review per spot
+    // Reviews: public read; auth users create own; owner delete
     match /reviews/{reviewId} {
       allow read: if true;
-      allow create: if request.auth != null
+      allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.rating is int
         && request.resource.data.rating >= 1
         && request.resource.data.rating <= 5
         && request.resource.data.text is string
         && request.resource.data.text.size() <= 1000;
-      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // Check-ins: public read; auth users create own; owner delete
+    match /checkins/{checkinId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // Stories: public read; auth users create own (6hr TTL enforced by Firestore TTL policy);
+    //          auth users can update viewCount/viewedBy only; owner or admin delete
+    match /stories/{storyId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.caption.size() <= 150;
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['viewCount', 'viewedBy']);
+      allow delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+    }
+
+    // Notifications: receiver read/update; admin create/delete
+    match /notifications/{notifId} {
+      allow read, update: if isSignedIn() && resource.data.toUserId == request.auth.uid;
+      allow create, delete: if isAdmin();
+    }
+
+    // Reports: auth users create; admin read/update/delete
+    match /reports/{reportId} {
+      allow create: if isSignedIn() && request.resource.data.reportedBy == request.auth.uid;
+      allow read, update, delete: if isAdmin();
     }
   }
 }
