@@ -243,6 +243,7 @@ export default function App() {
             onNotifications={() => setNotifOpen(true)}
             onSpotPress={handleSpotPress}
             onAddSpot={() => setAddSpot(true)}
+            onBack={() => setTab('map')}
           />
         </Suspense>
       );

@@ -7,9 +7,9 @@ import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationsContext';
 import { useStories } from '../context/StoriesContext';
 import SpotCard from '../components/SpotCard';
-import { BellIcon, EditIcon, SettingsIcon, PlusIcon } from '../components/Icons';
+import { BellIcon, EditIcon, SettingsIcon, PlusIcon, BackIcon } from '../components/Icons';
 
-export default function ProfileScreen({ onNavigateToAuth, onEditProfile, onSettings, onNotifications, onSpotPress, onAddSpot }) {
+export default function ProfileScreen({ onNavigateToAuth, onEditProfile, onSettings, onNotifications, onSpotPress, onAddSpot, onBack }) {
   const { t, isDark, toggleTheme } = useTheme();
   const { user, userProfile, logOut } = useAuth();
   const { checkinHistory } = useSpots();
@@ -51,7 +51,12 @@ export default function ProfileScreen({ onNavigateToAuth, onEditProfile, onSetti
 
   return (
     <div style={{ height: '100%', background: t.bg, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '60px 14px 12px', borderBottom: `1px solid ${t.border}`, background: t.surface }}>
+      <div style={{ padding: '60px 14px 12px', borderBottom: `1px solid ${t.border}`, background: t.surface, position: 'relative' }}>
+        {onBack && (
+          <button onClick={onBack} style={{ position: 'absolute', top: 16, left: 14, border: 'none', background: 'transparent', cursor: 'pointer', padding: 4 }}>
+            <BackIcon color={t.text} size={20} />
+          </button>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {userProfile?.profilePhotoURL ? <img src={userProfile.profilePhotoURL} alt="profile" style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover' }} /> : <div style={{ width: 60, height: 60, borderRadius: '50%', background: t.accentBg, color: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 20 }}>{initials}</div>}
           <div style={{ flex: 1 }}>

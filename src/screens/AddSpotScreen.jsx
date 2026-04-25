@@ -72,7 +72,11 @@ export default function AddSpotScreen({ onBack, onRequireAuth }) {
       setMsg('Spot added!');
       setTimeout(onBack, 1500);
     } catch (e) {
-      setMsg('Failed to add spot. Try again.');
+      setMsg(
+        e.code === 'permission-denied'
+          ? 'Permission denied — deploy Firestore rules first (firebase deploy --only firestore:rules).'
+          : `Failed to add spot: ${e.code || e.message}`
+      );
       setLoading(false);
     }
   };

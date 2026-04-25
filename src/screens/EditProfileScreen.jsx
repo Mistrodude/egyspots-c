@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { BackIcon } from '../components/Icons';
+import { BackIcon, CameraIcon } from '../components/Icons';
 
 const CITIES = ['Cairo', 'Giza', 'Alexandria', 'New Cairo', '6th of October', 'Other'];
 
 export default function EditProfileScreen({ onBack }) {
   const { t } = useTheme();
   const { userProfile, updateUserProfile, checkUsernameAvailable } = useAuth();
+  const fileRef = useRef(null);
   const [form, setForm] = useState({
     profilePhotoURL: userProfile?.profilePhotoURL || '',
     displayName: userProfile?.displayName || '',
@@ -47,10 +48,21 @@ export default function EditProfileScreen({ onBack }) {
         <div style={{ fontSize: 16, fontWeight: 700, color: t.text }}>Edit Profile</div>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <label style={{ ...label(t), alignItems: 'center', display: 'flex', gap: 8 }}>
-          <span>Profile photo</span>
-          <input type="file" accept="image/*" onChange={onPickFile} />
-        </label>
+        {/* Avatar — tap to pick photo */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
+          <div onClick={() => fileRef.current.click()} style={{ position: 'relative', width: 80, height: 80, cursor: 'pointer' }}>
+            {form.profilePhotoURL
+              ? <img src={form.profilePhotoURL} alt="avatar" style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover' }} />
+              : <div style={{ width: 80, height: 80, borderRadius: '50%', background: t.accentBg, color: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 28 }}>
+                  {(form.displayName || 'U')[0].toUpperCase()}
+                </div>
+            }
+            <div style={{ position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: '50%', background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CameraIcon color="white" size={13} />
+            </div>
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onPickFile} />
+        </div>
         <input value={form.displayName} onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))} placeholder="Display Name" style={inp(t)} />
         <input value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value.toLowerCase() }))} onBlur={checkUsername} placeholder="Username" style={inp(t)} />
         {usernameMsg && <div style={{ fontSize: 11, color: usernameMsg.includes('available') ? t.success : t.error }}>{usernameMsg}</div>}

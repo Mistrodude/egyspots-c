@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo } 
 import {
   collection, onSnapshot, doc, updateDoc, setDoc,
   addDoc, getDoc, getDocs, serverTimestamp, increment, query, where, orderBy, limit,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { SPOTS_SEED } from '../data/spots';
@@ -19,16 +20,18 @@ export function SpotsProvider({ children }) {
   const [loading,     setLoading]     = useState(true);
   const [checkinHistory, setCheckinHistory] = useState([]);
 
-  // Seed spots if Firestore collection is empty
+  // Seed spots atomically if Firestore collection is empty.
+  // writeBatch ensures a single onSnapshot update (no partial flicker).
   useEffect(() => {
     const seedIfEmpty = async () => {
       try {
         const snap = await getDocs(collection(db, 'spots'));
-        if (snap.empty) {
-          await Promise.all(
-            SPOTS_SEED.map((s) => setDoc(doc(db, 'spots', s.id), { ...s, createdAt: serverTimestamp() }))
-          );
-        }
+        if (!snap.empty) return;
+        const batch = writeBatch(db);
+        SPOTS_SEED.forEach((s) => {
+          batch.set(doc(db, 'spots', s.id), { ...s, createdAt: serverTimestamp() });
+        });
+        await batch.commit();
       } catch (e) {
         console.warn('Firestore seed skipped:', e.message);
       }

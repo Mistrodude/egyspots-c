@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useSpots } from '../context/SpotsContext';
 import MapView from '../components/MapView';
@@ -16,6 +16,7 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
   const [sheetOpen,    setSheetOpen]    = useState(false);
   const [locPing,      setLocPing]      = useState(false);
   const [userLocation, setUserLocation] = useState(null);
+  const dragRef = useRef(null);
 
   const filtered = useMemo(() => filterSpots(spots, category), [spots, category]);
 
@@ -33,11 +34,26 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
           setLocPing(false);
         },
         () => setLocPing(false),
-        { enableHighAccuracy: true, timeout: 8000 }
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
       );
     } else {
-      setTimeout(() => setLocPing(false), 1200);
+      setTimeout(() => setLocPing(false), 800);
     }
+  };
+
+  const onHandleTouchStart = (e) => {
+    dragRef.current = { startY: e.touches[0].clientY, wasOpen: sheetOpen };
+  };
+
+  const onHandleTouchEnd = (e) => {
+    if (!dragRef.current) return;
+    const dy = e.changedTouches[0].clientY - dragRef.current.startY;
+    if (Math.abs(dy) < 12) {
+      setSheetOpen((o) => !o);       // short tap = toggle
+    } else {
+      setSheetOpen(dy < 0);          // swipe up = open, swipe down = close
+    }
+    dragRef.current = null;
   };
 
   const PEEK_H = 210;
@@ -171,10 +187,12 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
         boxShadow: '0 -8px 40px rgba(0,0,0,0.3)',
         borderTop: `1px solid ${t.border}`,
       }}>
-        {/* Handle */}
+        {/* Handle — tap to toggle, drag up/down to open/close */}
         <div
-          onClick={() => setSheetOpen((o) => !o)}
-          style={{ padding: '12px 0 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }}
+          onTouchStart={onHandleTouchStart}
+          onTouchEnd={onHandleTouchEnd}
+          onClick={() => { if (!dragRef.current) setSheetOpen((o) => !o); }}
+          style={{ padding: '12px 0 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', flexShrink: 0, userSelect: 'none' }}
         >
           <div style={{ width: 36, height: 4, borderRadius: 4, background: t.border, marginBottom: 8 }} />
           <div style={{ fontSize: 11, fontWeight: 700, color: t.muted, letterSpacing: '0.8px' }}>

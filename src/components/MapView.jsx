@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTheme } from '../context/ThemeContext';
@@ -14,6 +14,7 @@ export default function MapView({ spots, selectedId, onSpotPress, checkedInId, f
   const markerLayerRef = useRef(null);
   const userMarkerRef = useRef(null);
   const userPulseRef = useRef(null);
+  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -32,18 +33,21 @@ export default function MapView({ spots, selectedId, onSpotPress, checkedInId, f
     ).addTo(map);
 
     markerLayerRef.current = L.layerGroup().addTo(map);
-
     mapRef.current = map;
+    setMapReady(true);
+
     return () => {
       map.remove();
       mapRef.current = null;
       markerLayerRef.current = null;
       userMarkerRef.current = null;
       userPulseRef.current = null;
+      setMapReady(false);
     };
   }, [isDark]);
 
   useEffect(() => {
+    if (!mapReady) return;
     const map = mapRef.current;
     const layer = markerLayerRef.current;
     if (!map || !layer) return;
@@ -86,7 +90,7 @@ export default function MapView({ spots, selectedId, onSpotPress, checkedInId, f
         fillOpacity: 1,
       }).on('click', () => onSpotPress(spot)).addTo(layer);
     });
-  }, [spots, selectedId, checkedInId, onSpotPress, isDark, storiesBySpot]);
+  }, [mapReady, spots, selectedId, checkedInId, onSpotPress, isDark, storiesBySpot]);
 
   useEffect(() => {
     const map = mapRef.current;
