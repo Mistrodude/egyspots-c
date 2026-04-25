@@ -16,7 +16,7 @@ const CATEGORY_VALUES = {
   'Open Air':    'open_air',
 };
 
-export default function AddSpotScreen({ onBack, onRequireAuth }) {
+export default function AddSpotScreen({ onBack, onRequireAuth, userPos }) {
   const { t } = useTheme();
   const { user, userProfile } = useAuth();
   const [form, setForm] = useState({
@@ -37,6 +37,7 @@ export default function AddSpotScreen({ onBack, onRequireAuth }) {
   const toggleTag = (tag) => setForm((f) => ({ ...f, tags: f.tags.includes(tag) ? f.tags.filter((x) => x !== tag) : [...f.tags, tag] }));
 
   const submit = async () => {
+    if (!userPos) { setMsg('GPS required — we need your location to pin this spot on the map.'); return; }
     if (!form.name.trim()) { setMsg('Spot name is required.'); return; }
     if (!form.address.trim()) { setMsg('Address is required.'); return; }
     setLoading(true);
@@ -64,8 +65,8 @@ export default function AddSpotScreen({ onBack, onRequireAuth }) {
         rating:        0,
         crowd:         'Chill',
         crowdPct:      0,
-        lat:           30.0444,
-        lng:           31.2357,
+        lat:           userPos.lat,
+        lng:           userPos.lng,
         operatingHours: null,
         createdAt:     serverTimestamp(),
       });
@@ -86,6 +87,21 @@ export default function AddSpotScreen({ onBack, onRequireAuth }) {
       <div style={{ padding: '52px 12px 12px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
         <button onClick={onBack} style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}><BackIcon color={t.text} size={18} /></button>
         <div style={{ color: t.text, fontWeight: 700, fontSize: 16 }}>Add a Spot</div>
+      </div>
+
+      {/* GPS status banner */}
+      <div style={{
+        padding: '8px 14px',
+        background: userPos ? 'rgba(34,197,94,0.12)' : 'rgba(234,179,8,0.12)',
+        borderBottom: `1px solid ${userPos ? 'rgba(34,197,94,0.3)' : 'rgba(234,179,8,0.3)'}`,
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: userPos ? '#22c55e' : '#eab308', flexShrink: 0 }} />
+        <span style={{ fontSize: 12, color: userPos ? '#22c55e' : '#eab308', fontFamily: 'Outfit, sans-serif' }}>
+          {userPos
+            ? `GPS locked — spot will be pinned at your location (${userPos.lat.toFixed(4)}, ${userPos.lng.toFixed(4)})`
+            : 'Acquiring GPS… enable location to pin this spot on the map'}
+        </span>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -138,10 +154,10 @@ export default function AddSpotScreen({ onBack, onRequireAuth }) {
       <div style={{ borderTop: `1px solid ${t.border}`, padding: 12 }}>
         <button
           onClick={submit}
-          disabled={loading}
-          style={{ width: '100%', border: 'none', background: t.accent, color: 'white', borderRadius: 12, padding: 14, cursor: 'pointer', fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: 14, opacity: loading ? 0.7 : 1 }}
+          disabled={loading || !userPos}
+          style={{ width: '100%', border: 'none', background: t.accent, color: 'white', borderRadius: 12, padding: 14, cursor: (!userPos || loading) ? 'not-allowed' : 'pointer', fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: 14, opacity: (loading || !userPos) ? 0.5 : 1 }}
         >
-          {loading ? 'Publishing…' : 'Add Spot'}
+          {loading ? 'Publishing…' : !userPos ? 'Waiting for GPS…' : 'Add Spot'}
         </button>
       </div>
     </div>

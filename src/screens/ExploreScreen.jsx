@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useSpots } from '../context/SpotsContext';
 import MapView from '../components/MapView';
@@ -7,6 +7,7 @@ import { CATEGORIES, filterSpots } from '../data/spots';
 import { CATEGORY_ICONS, LocateIcon, SearchIcon, ExploreIcon } from '../components/Icons';
 
 const ACTIVE_COUNT = 342;
+const PEEK_H = 210;
 
 export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) {
   const { t, isDark }  = useTheme();
@@ -16,9 +17,26 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
   const [sheetOpen,    setSheetOpen]    = useState(false);
   const [locPing,      setLocPing]      = useState(false);
   const [userLocation, setUserLocation] = useState(null);
-  const dragRef = useRef(null);
+
+  const sheetRef   = useRef(null);
+  const dragState  = useRef(null);
 
   const filtered = useMemo(() => filterSpots(spots, category), [spots, category]);
+
+  // Non-passive touchmove so we can call preventDefault() and block page scroll while dragging
+  useEffect(() => {
+    const sheet = sheetRef.current;
+    if (!sheet) return;
+    const onMove = (e) => {
+      if (!dragState.current) return;
+      e.preventDefault();
+      const dy = dragState.current.startY - e.touches[0].clientY;
+      const newH = Math.max(PEEK_H, Math.min(dragState.current.maxH, dragState.current.startH + dy));
+      sheet.style.height = `${newH}px`;
+    };
+    sheet.addEventListener('touchmove', onMove, { passive: false });
+    return () => sheet.removeEventListener('touchmove', onMove);
+  }, []);
 
   const handleSpotPress = (spot) => {
     setSelectedId(spot.id);
@@ -42,21 +60,35 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
   };
 
   const onHandleTouchStart = (e) => {
-    dragRef.current = { startY: e.touches[0].clientY, wasOpen: sheetOpen };
+    const sheet = sheetRef.current;
+    if (!sheet) return;
+    sheet.style.transition = 'none';
+    dragState.current = {
+      startY: e.touches[0].clientY,
+      startH: sheet.offsetHeight,
+      maxH:   Math.round((sheet.parentElement?.clientHeight ?? window.innerHeight) * 0.88),
+      t:      Date.now(),
+    };
   };
 
   const onHandleTouchEnd = (e) => {
-    if (!dragRef.current) return;
-    const dy = e.changedTouches[0].clientY - dragRef.current.startY;
-    if (Math.abs(dy) < 12) {
-      setSheetOpen((o) => !o);       // short tap = toggle
-    } else {
-      setSheetOpen(dy < 0);          // swipe up = open, swipe down = close
-    }
-    dragRef.current = null;
+    e.preventDefault(); // suppress synthetic click after touch
+    if (!dragState.current || !sheetRef.current) return;
+    const sheet = sheetRef.current;
+    const dy  = dragState.current.startY - e.changedTouches[0].clientY;
+    const dt  = Date.now() - dragState.current.t;
+    const vel = dy / Math.max(dt, 1);
+    sheet.style.transition = 'height 0.4s cubic-bezier(.32,1,.36,1)';
+    let open;
+    if (Math.abs(dy) < 10)        open = !sheetOpen;
+    else if (Math.abs(vel) > 0.3)  open = vel > 0;
+    else                           open = sheet.offsetHeight > (PEEK_H + dragState.current.maxH) / 2;
+    sheet.style.height = `${open ? dragState.current.maxH : PEEK_H}px`;
+    setSheetOpen(open);
+    dragState.current = null;
   };
 
-  const PEEK_H = 210;
+  const mapCtrlBottom = sheetOpen ? 'calc(88% + 14px)' : PEEK_H + 14;
 
   return (
     <div style={{ position: 'relative', height: '100%', overflow: 'hidden', background: t.bg }}>
@@ -77,31 +109,20 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
         <button
           type="button"
           onClick={onOpenSearch}
-          style={{
-            width: '100%',
-            border: 'none',
-            textAlign: 'left',
-            cursor: 'pointer',
-            background: 'transparent',
-            padding: 0,
-          }}
+          style={{ width: '100%', border: 'none', textAlign: 'left', cursor: 'pointer', background: 'transparent', padding: 0 }}
           aria-label="Open spot search"
         >
           <div style={{
-          background: isDark
-            ? 'rgba(21,18,30,0.88)' : 'rgba(255,255,255,0.9)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          borderRadius: 16, padding: '10px 14px',
-          display: 'flex', alignItems: 'center', gap: 10,
-          boxShadow: t.shadow2, border: `1px solid ${t.border}`,
+            background: isDark ? 'rgba(21,18,30,0.88)' : 'rgba(255,255,255,0.9)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            borderRadius: 16, padding: '10px 14px',
+            display: 'flex', alignItems: 'center', gap: 10,
+            boxShadow: t.shadow2, border: `1px solid ${t.border}`,
           }}>
             <SearchIcon color={t.muted} size={16} />
             <span style={{ fontSize: 13, color: t.muted, flex: 1 }}>Search Cairo spots...</span>
-            <div style={{
-              width: 26, height: 26, borderRadius: 8, background: t.accent,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
+            <div style={{ width: 26, height: 26, borderRadius: 8, background: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ExploreIcon color="white" size={13} />
             </div>
           </div>
@@ -111,7 +132,7 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
       {/* Map controls */}
       <div style={{
         position: 'absolute', right: 14,
-        bottom: sheetOpen ? 'calc(68% + 14px)' : PEEK_H + 14,
+        bottom: mapCtrlBottom,
         zIndex: 1200, display: 'flex', flexDirection: 'column', gap: 8,
         transition: 'bottom 0.4s cubic-bezier(.32,1,.36,1)',
       }}>
@@ -126,7 +147,6 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
           <LocateIcon color={locPing ? t.accent : t.muted} size={18} />
         </button>
 
-        {/* Compass */}
         <button style={{
           width: 40, height: 40, borderRadius: '50%',
           border: `1px solid ${t.border}`, cursor: 'pointer',
@@ -142,7 +162,6 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
           </svg>
         </button>
 
-        {/* Add Spot */}
         <button onClick={onAddSpot} title="Create a new spot" style={{
           width: 40, height: 40, borderRadius: '50%',
           border: `1px solid ${t.border}`, cursor: 'pointer',
@@ -161,7 +180,7 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
       {/* Live badge */}
       <div style={{
         position: 'absolute', left: 14,
-        bottom: sheetOpen ? 'calc(68% + 14px)' : PEEK_H + 14,
+        bottom: mapCtrlBottom,
         zIndex: 1200,
         transition: 'bottom 0.4s cubic-bezier(.32,1,.36,1)',
         background: 'rgba(208,106,80,0.9)',
@@ -174,25 +193,26 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
       </div>
 
       {/* Bottom sheet */}
-      <div style={{
-        position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 1300,
-        height: sheetOpen ? '68%' : PEEK_H,
-        transition: 'height 0.4s cubic-bezier(.32,1,.36,1)',
-        display: 'flex', flexDirection: 'column',
-        background: isDark
-          ? 'rgba(13,11,20,0.97)' : 'rgba(250,247,242,0.97)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderRadius: '24px 24px 0 0',
-        boxShadow: '0 -8px 40px rgba(0,0,0,0.3)',
-        borderTop: `1px solid ${t.border}`,
-      }}>
-        {/* Handle — tap to toggle, drag up/down to open/close */}
+      <div
+        ref={sheetRef}
+        style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 1300,
+          height: PEEK_H,
+          transition: 'height 0.4s cubic-bezier(.32,1,.36,1)',
+          display: 'flex', flexDirection: 'column',
+          background: isDark ? 'rgba(13,11,20,0.97)' : 'rgba(250,247,242,0.97)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderRadius: '24px 24px 0 0',
+          boxShadow: '0 -8px 40px rgba(0,0,0,0.3)',
+          borderTop: `1px solid ${t.border}`,
+        }}
+      >
+        {/* Handle — drag up/down; short tap = toggle */}
         <div
           onTouchStart={onHandleTouchStart}
           onTouchEnd={onHandleTouchEnd}
-          onClick={() => { if (!dragRef.current) setSheetOpen((o) => !o); }}
-          style={{ padding: '12px 0 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', flexShrink: 0, userSelect: 'none' }}
+          style={{ padding: '12px 0 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', flexShrink: 0, userSelect: 'none', touchAction: 'none' }}
         >
           <div style={{ width: 36, height: 4, borderRadius: 4, background: t.border, marginBottom: 8 }} />
           <div style={{ fontSize: 11, fontWeight: 700, color: t.muted, letterSpacing: '0.8px' }}>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  collection, query, where, orderBy, onSnapshot,
+  collection, query, orderBy, onSnapshot,
   addDoc, serverTimestamp, limit,
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -25,8 +25,7 @@ export default function ChatScreen({ spot, onBack }) {
   useEffect(() => {
     if (!spot?.id) return;
     const q = query(
-      collection(db, 'messages'),
-      where('spotId', '==', spot.id),
+      collection(db, 'spots', spot.id, 'messages'),
       orderBy('createdAt', 'asc'),
       limit(100),
     );
@@ -45,13 +44,11 @@ export default function ChatScreen({ spot, onBack }) {
     const displayName = user?.displayName || 'Anonymous';
     const initials    = getInitials(displayName);
 
-    await addDoc(collection(db, 'messages'), {
-      spotId:    spot.id,
+    await addDoc(collection(db, 'spots', spot.id, 'messages'), {
       text,
       userId:    user?.uid || 'guest',
       userName:  displayName,
       userAvatar:initials,
-      mine:      false, // stored false; we detect "mine" by userId
       createdAt: serverTimestamp(),
     }).catch((e) => console.warn('Send error:', e.message));
   };

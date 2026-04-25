@@ -24,7 +24,7 @@ export default function CheckInModal({ spot, onClose, onSuccess }) {
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setLocError('Location permission denied. Enable location and try again.'),
+      () => setLocError("Habibi, we need your GPS to verify you're actually at the spot. Enable location in your browser settings and try again."),
       { enableHighAccuracy: true, timeout: 10000 }
     );
   }, []);

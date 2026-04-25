@@ -9,6 +9,21 @@ import { SPOTS_SEED } from '../data/spots';
 
 const StoriesContext = createContext(null);
 
+// Immediate in-memory stories so the Stories tab is never empty on first load
+const MOCK_STORIES_LIVE = SPOTS_SEED.slice(0, 4).map((spot, i) => ({
+  id:           `mock_${spot.id}`,
+  spotId:       spot.id,
+  userId:       'demo_user',
+  userName:     'EgySpots Demo',
+  userPhotoURL: null,
+  photoURL:     `https://picsum.photos/seed/${spot.id}/400/700`,
+  caption:      `Live at ${spot.name}! 🔥`,
+  createdAt:    { toDate: () => new Date() },
+  expiresAt:    { toDate: () => new Date(Date.now() + 6 * 3600 * 1000) },
+  viewCount:    i * 4,
+  viewedBy:     [],
+}));
+
 async function seedDemoStories(uid) {
   try {
     const now = Timestamp.now();
@@ -35,7 +50,7 @@ async function seedDemoStories(uid) {
 
 export function StoriesProvider({ children }) {
   const { user } = useAuth();
-  const [stories, setStories] = useState([]);
+  const [stories, setStories] = useState(MOCK_STORIES_LIVE);
   const [loading, setLoading] = useState(true);
   const seededRef = useRef(false);
 
@@ -72,7 +87,7 @@ export function StoriesProvider({ children }) {
             const exp = s.expiresAt?.toDate ? s.expiresAt.toDate() : new Date(s.expiresAt);
             return exp > now2;
           });
-        setStories(docs);
+        setStories(docs.length > 0 ? docs : MOCK_STORIES_LIVE);
         setLoading(false);
       },
       () => setLoading(false)

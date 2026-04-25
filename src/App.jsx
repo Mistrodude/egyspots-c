@@ -147,7 +147,7 @@ export default function App() {
 
   if (addSpotOpen) return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: t.bg }}>
-      <Suspense fallback={S}><AddSpotScreen onBack={() => setAddSpot(false)} onRequireAuth={() => { setAddSpot(false); setAuthOpen(true); }} /></Suspense>
+      <Suspense fallback={S}><AddSpotScreen onBack={() => setAddSpot(false)} onRequireAuth={() => { setAddSpot(false); setAuthOpen(true); }} userPos={userPos} /></Suspense>
     </div>
   );
 

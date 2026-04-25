@@ -1,4 +1,6 @@
 import { useState, useRef } from 'react';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../firebase';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { BackIcon, CameraIcon } from '../components/Icons';
@@ -7,7 +9,7 @@ const CITIES = ['Cairo', 'Giza', 'Alexandria', 'New Cairo', '6th of October', 'O
 
 export default function EditProfileScreen({ onBack }) {
   const { t } = useTheme();
-  const { userProfile, updateUserProfile, checkUsernameAvailable } = useAuth();
+  const { user, userProfile, updateUserProfile, checkUsernameAvailable } = useAuth();
   const fileRef = useRef(null);
   const [form, setForm] = useState({
     profilePhotoURL: userProfile?.profilePhotoURL || '',
@@ -36,7 +38,16 @@ export default function EditProfileScreen({ onBack }) {
 
   const save = async () => {
     setSaving(true);
-    await updateUserProfile(form);
+    let photoURL = form.profilePhotoURL;
+    if (photoURL?.startsWith('blob:') && user) {
+      try {
+        const blob = await fetch(photoURL).then((r) => r.blob());
+        const storageRef = ref(storage, `users/${user.uid}/profile.jpg`);
+        await uploadBytes(storageRef, blob, { contentType: blob.type || 'image/jpeg' });
+        photoURL = await getDownloadURL(storageRef);
+      } catch (_) {}
+    }
+    await updateUserProfile({ ...form, profilePhotoURL: photoURL });
     setSaving(false);
     onBack();
   };
