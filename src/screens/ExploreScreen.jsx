@@ -8,7 +8,7 @@ import { CATEGORY_ICONS, LocateIcon, SearchIcon, ExploreIcon } from '../componen
 
 const ACTIVE_COUNT = 342;
 
-export default function ExploreScreen({ onSpotPress, onOpenSearch }) {
+export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) {
   const { t, isDark }  = useTheme();
   const { spots, checkedInId } = useSpots();
   const [category,     setCategory]     = useState('All');
@@ -123,6 +123,21 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch }) {
             <circle cx="12" cy="12" r="10" stroke={t.muted} strokeWidth="1.6" />
             <polygon points="12,4 14.5,12 12,10.5 9.5,12" fill={t.accent} />
             <polygon points="12,20 9.5,12 12,13.5 14.5,12" fill={t.muted} />
+          </svg>
+        </button>
+
+        {/* Add Spot */}
+        <button onClick={onAddSpot} title="Create a new spot" style={{
+          width: 40, height: 40, borderRadius: '50%',
+          border: `1px solid ${t.border}`, cursor: 'pointer',
+          background: 'rgba(21,18,30,0.9)',
+          backdropFilter: 'blur(12px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: t.shadow2,
+        }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke={t.accent} strokeWidth="1.6" />
+            <path d="M12 8v8M8 12h8" stroke={t.accent} strokeWidth="2" strokeLinecap="round" />
           </svg>
         </button>
       </div>

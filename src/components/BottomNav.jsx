@@ -10,10 +10,11 @@ const TABS = [
   { id: 'profile', Icon: ProfileIcon, label: 'Profile' },
 ];
 
-export default function BottomNav({ tab, setTab, onStoryFABPress }) {
+export default function BottomNav({ tab, setTab, onStoryFABPress, nearbySpot }) {
   const { t } = useTheme();
   const { unreadCount } = useNotifications();
   const { unviewedCount } = useStories();
+  const isNearSpot = !!nearbySpot;
 
   return (
     <div style={{
@@ -33,28 +34,38 @@ export default function BottomNav({ tab, setTab, onStoryFABPress }) {
         <TabButton key={id} id={id} Icon={Icon} label={label} active={tab === id} setTab={setTab} t={t} />
       ))}
 
-      {/* Center Story FAB */}
+      {/* Center FAB — Check In when near a spot, Story otherwise */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', paddingBottom: 2 }}>
         <button
           onClick={onStoryFABPress}
-          aria-label="Post a story"
+          aria-label={isNearSpot ? `Check in to ${nearbySpot.name}` : 'Post a story'}
           style={{
             width: 44, height: 44, borderRadius: '50%',
-            background: `linear-gradient(135deg, ${t.accent}, ${t.accent}cc)`,
+            background: isNearSpot
+              ? 'linear-gradient(135deg, #22c55e, #16a34a)'
+              : `linear-gradient(135deg, ${t.accent}, ${t.accent}cc)`,
             border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: `0 4px 20px ${t.accent}66`,
+            boxShadow: isNearSpot ? '0 4px 20px rgba(34,197,94,0.5)' : `0 4px 20px ${t.accent}66`,
             marginTop: -10,
-            transition: 'transform 0.15s, box-shadow 0.15s',
+            transition: 'transform 0.15s, box-shadow 0.15s, background 0.3s',
           }}
           onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.93)'; }}
           onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
           onTouchStart={(e) => { e.currentTarget.style.transform = 'scale(0.93)'; }}
           onTouchEnd={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
         >
-          <PlusIcon color="white" size={18} />
+          {isNearSpot ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M20 6L9 17l-5-5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <PlusIcon color="white" size={18} />
+          )}
         </button>
-        <span style={{ fontSize: 9, fontWeight: 600, color: t.muted, letterSpacing: '0.3px', marginTop: 2 }}>Story</span>
+        <span style={{ fontSize: 9, fontWeight: 600, color: isNearSpot ? '#22c55e' : t.muted, letterSpacing: '0.3px', marginTop: 2 }}>
+          {isNearSpot ? 'Check In' : 'Story'}
+        </span>
       </div>
 
       {/* Stories + Profile tabs */}

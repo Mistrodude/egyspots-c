@@ -6,8 +6,9 @@ import { storage, db } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { addDoc, collection, Timestamp } from 'firebase/firestore';
 import { XIcon, CameraIcon } from '../components/Icons';
+import { haversineMeters, STORY_RADIUS_M } from '../utils/geo';
 
-export default function AddStoryScreen({ onClose, onRequireAuth, defaultSpotId }) {
+export default function AddStoryScreen({ onClose, onRequireAuth, defaultSpotId, userPos }) {
   const { t } = useTheme();
   const { user, userProfile } = useAuth();
   const { spots } = useSpots();
@@ -36,6 +37,13 @@ export default function AddStoryScreen({ onClose, onRequireAuth, defaultSpotId }
 
   const handleSubmit = async () => {
     if (!photo || !spotId) { setError('Please select a photo and a spot.'); return; }
+    if (userPos && spot) {
+      const dist = haversineMeters(userPos, spot);
+      if (dist > STORY_RADIUS_M) {
+        setError(`You need to be at ${spot.name} to post a story (you're ${Math.round(dist)}m away).`);
+        return;
+      }
+    }
     setLoading(true);
     setError('');
     try {

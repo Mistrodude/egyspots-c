@@ -7,7 +7,7 @@ import { useStories } from '../context/StoriesContext';
 const CAIRO_CENTER = [31.2357, 30.0444];
 
 export default function MapView({ spots, selectedId, onSpotPress, checkedInId, flyToTarget }) {
-  const { isDark } = useTheme();
+  const { isDark, t } = useTheme();
   const { storiesBySpot } = useStories();
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -118,6 +118,6 @@ export default function MapView({ spots, selectedId, onSpotPress, checkedInId, f
   }, [flyToTarget]);
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+    <div ref={containerRef} style={{ width: '100%', height: '100%', backgroundColor: t.bg }} />
   );
 }

@@ -1,4 +1,5 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
+import { haversineMeters, CHECKIN_RADIUS_M } from './utils/geo';
 import { useTheme }  from './context/ThemeContext';
 import { useAuth }   from './context/AuthContext';
 import { useSpots }  from './context/SpotsContext';
@@ -27,7 +28,7 @@ const S = <Loading message="Loading…" />;
 export default function App() {
   const { t }    = useTheme();
   const { loading: authLoading, user, userProfile } = useAuth();
-  const { loading: spotsLoading } = useSpots();
+  const { loading: spotsLoading, spots } = useSpots();
 
   const [tab,            setTab]           = useState('map');
   const [selectedSpot,   setSelectedSpot]  = useState(null);
@@ -45,6 +46,31 @@ export default function App() {
     () => localStorage.getItem('onboardingDone') === 'true'
   );
 
+  const [userPos,    setUserPos]    = useState(null);
+  const [nearbySpot, setNearbySpot] = useState(null);
+
+  // Watch GPS position continuously
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 10000 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
+
+  // Compute nearest spot within check-in radius
+  useEffect(() => {
+    if (!userPos || !spots?.length) { setNearbySpot(null); return; }
+    let closest = null, minDist = Infinity;
+    spots.forEach((s) => {
+      const d = haversineMeters(userPos, s);
+      if (d < minDist) { minDist = d; closest = s; }
+    });
+    setNearbySpot(minDist <= CHECKIN_RADIUS_M ? closest : null);
+  }, [userPos, spots]);
+
   const [guestInteractions, setGuestInteractions] = useState(0);
   const bumpGuest = () => {
     if (!user) {
@@ -55,9 +81,13 @@ export default function App() {
     }
   };
 
-  const handleStoryFAB = () => {
+  const handleFAB = () => {
     if (!user) { setAuthOpen(true); return; }
-    setAddStory(true);
+    if (nearbySpot) {
+      setCheckInSpot(nearbySpot);
+    } else {
+      setAddStory(true);
+    }
   };
 
   const handleSpotPress = (spot) => {
@@ -123,7 +153,7 @@ export default function App() {
 
   if (addStoryOpen) return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: t.bg }}>
-      <Suspense fallback={S}><AddStoryScreen onClose={() => setAddStory(false)} onRequireAuth={() => { setAddStory(false); setAuthOpen(true); }} /></Suspense>
+      <Suspense fallback={S}><AddStoryScreen onClose={() => setAddStory(false)} onRequireAuth={() => { setAddStory(false); setAuthOpen(true); }} userPos={userPos} /></Suspense>
     </div>
   );
 
@@ -173,7 +203,7 @@ export default function App() {
           onRequireAuth={() => { setSelectedSpot(null); setAuthOpen(true); }}
         />
       </Suspense>
-      <BottomNav tab={tab} setTab={(id) => { setSelectedSpot(null); setTab(id); }} onStoryFABPress={handleStoryFAB} />
+      <BottomNav tab={tab} setTab={(id) => { setSelectedSpot(null); setTab(id); }} onStoryFABPress={handleFAB} nearbySpot={nearbySpot} />
     </div>
   );
 
@@ -184,6 +214,7 @@ export default function App() {
           onSpotPress={handleSpotPress}
           onOpenSearch={() => setSearchOpen(true)}
           onOpenNotifications={() => { if (!user) { setAuthOpen(true); return; } setNotifOpen(true); }}
+          onAddSpot={() => { if (!user) { setAuthOpen(true); return; } setAddSpot(true); }}
         />
       );
       case 'explore': return (
@@ -224,7 +255,7 @@ export default function App() {
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         {mainScreen}
       </div>
-      <BottomNav tab={tab} setTab={setTab} onStoryFABPress={handleStoryFAB} />
+      <BottomNav tab={tab} setTab={setTab} onStoryFABPress={handleFAB} nearbySpot={nearbySpot} />
     </div>
   );
 }
