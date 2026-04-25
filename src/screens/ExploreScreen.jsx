@@ -18,24 +18,18 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
   const [locPing,      setLocPing]      = useState(false);
   const [userLocation, setUserLocation] = useState(null);
 
-  const sheetRef   = useRef(null);
-  const dragState  = useRef(null);
+  const handleRef = useRef(null);
+  const dragRef   = useRef(null);
 
   const filtered = useMemo(() => filterSpots(spots, category), [spots, category]);
 
-  // Non-passive touchmove so we can call preventDefault() and block page scroll while dragging
+  // Non-passive touchmove on the handle only — prevents page scroll while dragging
   useEffect(() => {
-    const sheet = sheetRef.current;
-    if (!sheet) return;
-    const onMove = (e) => {
-      if (!dragState.current) return;
-      e.preventDefault();
-      const dy = dragState.current.startY - e.touches[0].clientY;
-      const newH = Math.max(PEEK_H, Math.min(dragState.current.maxH, dragState.current.startH + dy));
-      sheet.style.height = `${newH}px`;
-    };
-    sheet.addEventListener('touchmove', onMove, { passive: false });
-    return () => sheet.removeEventListener('touchmove', onMove);
+    const el = handleRef.current;
+    if (!el) return;
+    const onMove = (e) => { if (dragRef.current) e.preventDefault(); };
+    el.addEventListener('touchmove', onMove, { passive: false });
+    return () => el.removeEventListener('touchmove', onMove);
   }, []);
 
   const handleSpotPress = (spot) => {
@@ -59,33 +53,17 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
     }
   };
 
-  const onHandleTouchStart = (e) => {
-    const sheet = sheetRef.current;
-    if (!sheet) return;
-    sheet.style.transition = 'none';
-    dragState.current = {
-      startY: e.touches[0].clientY,
-      startH: sheet.offsetHeight,
-      maxH:   Math.round((sheet.parentElement?.clientHeight ?? window.innerHeight) * 0.88),
-      t:      Date.now(),
-    };
+  const onTouchStart = (e) => {
+    dragRef.current = { startY: e.touches[0].clientY, t: Date.now() };
   };
 
-  const onHandleTouchEnd = (e) => {
-    e.preventDefault(); // suppress synthetic click after touch
-    if (!dragState.current || !sheetRef.current) return;
-    const sheet = sheetRef.current;
-    const dy  = dragState.current.startY - e.changedTouches[0].clientY;
-    const dt  = Date.now() - dragState.current.t;
-    const vel = dy / Math.max(dt, 1);
-    sheet.style.transition = 'height 0.4s cubic-bezier(.32,1,.36,1)';
-    let open;
-    if (Math.abs(dy) < 10)        open = !sheetOpen;
-    else if (Math.abs(vel) > 0.3)  open = vel > 0;
-    else                           open = sheet.offsetHeight > (PEEK_H + dragState.current.maxH) / 2;
-    sheet.style.height = `${open ? dragState.current.maxH : PEEK_H}px`;
-    setSheetOpen(open);
-    dragState.current = null;
+  const onTouchEnd = (e) => {
+    if (!dragRef.current) return;
+    const dy  = dragRef.current.startY - e.changedTouches[0].clientY;
+    const vel = dy / Math.max(Date.now() - dragRef.current.t, 1);
+    dragRef.current = null;
+    if (Math.abs(dy) < 8) { setSheetOpen((o) => !o); return; }
+    setSheetOpen(Math.abs(vel) > 0.3 ? vel > 0 : dy > 0);
   };
 
   const mapCtrlBottom = sheetOpen ? 'calc(88% + 14px)' : PEEK_H + 14;
@@ -114,8 +92,7 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
         >
           <div style={{
             background: isDark ? 'rgba(21,18,30,0.88)' : 'rgba(255,255,255,0.9)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
+            backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
             borderRadius: 16, padding: '10px 14px',
             display: 'flex', alignItems: 'center', gap: 10,
             boxShadow: t.shadow2, border: `1px solid ${t.border}`,
@@ -131,16 +108,14 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
 
       {/* Map controls */}
       <div style={{
-        position: 'absolute', right: 14,
-        bottom: mapCtrlBottom,
+        position: 'absolute', right: 14, bottom: mapCtrlBottom,
         zIndex: 1200, display: 'flex', flexDirection: 'column', gap: 8,
         transition: 'bottom 0.4s cubic-bezier(.32,1,.36,1)',
       }}>
         <button onClick={handleLocate} style={{
           width: 40, height: 40, borderRadius: '50%',
           border: `1px solid ${t.border}`, cursor: 'pointer',
-          background: 'rgba(21,18,30,0.9)',
-          backdropFilter: 'blur(12px)',
+          background: 'rgba(21,18,30,0.9)', backdropFilter: 'blur(12px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: t.shadow2,
         }}>
@@ -150,8 +125,7 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
         <button style={{
           width: 40, height: 40, borderRadius: '50%',
           border: `1px solid ${t.border}`, cursor: 'pointer',
-          background: 'rgba(21,18,30,0.9)',
-          backdropFilter: 'blur(12px)',
+          background: 'rgba(21,18,30,0.9)', backdropFilter: 'blur(12px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: t.shadow2,
         }}>
@@ -165,8 +139,7 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
         <button onClick={onAddSpot} title="Create a new spot" style={{
           width: 40, height: 40, borderRadius: '50%',
           border: `1px solid ${t.border}`, cursor: 'pointer',
-          background: 'rgba(21,18,30,0.9)',
-          backdropFilter: 'blur(12px)',
+          background: 'rgba(21,18,30,0.9)', backdropFilter: 'blur(12px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: t.shadow2,
         }}>
@@ -179,12 +152,9 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
 
       {/* Live badge */}
       <div style={{
-        position: 'absolute', left: 14,
-        bottom: mapCtrlBottom,
-        zIndex: 1200,
-        transition: 'bottom 0.4s cubic-bezier(.32,1,.36,1)',
-        background: 'rgba(208,106,80,0.9)',
-        backdropFilter: 'blur(8px)',
+        position: 'absolute', left: 14, bottom: mapCtrlBottom,
+        zIndex: 1200, transition: 'bottom 0.4s cubic-bezier(.32,1,.36,1)',
+        background: 'rgba(208,106,80,0.9)', backdropFilter: 'blur(8px)',
         borderRadius: 20, padding: '5px 11px',
         display: 'flex', alignItems: 'center', gap: 6,
       }}>
@@ -193,26 +163,29 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
       </div>
 
       {/* Bottom sheet */}
-      <div
-        ref={sheetRef}
-        style={{
-          position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 1300,
-          height: PEEK_H,
-          transition: 'height 0.4s cubic-bezier(.32,1,.36,1)',
-          display: 'flex', flexDirection: 'column',
-          background: isDark ? 'rgba(13,11,20,0.97)' : 'rgba(250,247,242,0.97)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          borderRadius: '24px 24px 0 0',
-          boxShadow: '0 -8px 40px rgba(0,0,0,0.3)',
-          borderTop: `1px solid ${t.border}`,
-        }}
-      >
-        {/* Handle — drag up/down; short tap = toggle */}
+      <div style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 1300,
+        height: sheetOpen ? '88%' : PEEK_H,
+        transition: 'height 0.4s cubic-bezier(.32,1,.36,1)',
+        display: 'flex', flexDirection: 'column',
+        background: isDark ? 'rgba(13,11,20,0.97)' : 'rgba(250,247,242,0.97)',
+        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+        borderRadius: '24px 24px 0 0',
+        boxShadow: '0 -8px 40px rgba(0,0,0,0.3)',
+        borderTop: `1px solid ${t.border}`,
+      }}>
+        {/* Drag handle — tap or swipe to open/close */}
         <div
-          onTouchStart={onHandleTouchStart}
-          onTouchEnd={onHandleTouchEnd}
-          style={{ padding: '12px 0 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', flexShrink: 0, userSelect: 'none', touchAction: 'none' }}
+          ref={handleRef}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+          onClick={() => setSheetOpen((o) => !o)}
+          style={{
+            padding: '12px 0 4px',
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            cursor: 'pointer', flexShrink: 0, userSelect: 'none',
+            touchAction: 'none',
+          }}
         >
           <div style={{ width: 36, height: 4, borderRadius: 4, background: t.border, marginBottom: 8 }} />
           <div style={{ fontSize: 11, fontWeight: 700, color: t.muted, letterSpacing: '0.8px' }}>
@@ -243,12 +216,13 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
           <div style={{ width: 8, flexShrink: 0 }} />
         </div>
 
-        {/* Spot list */}
+        {/* Spot list — always scrollable; sheet height clips the overflow */}
         <div style={{
-          flex: 1, overflowY: sheetOpen ? 'auto' : 'hidden',
+          flex: 1, overflowY: 'auto',
           padding: '0 14px 16px',
           display: 'flex', flexDirection: 'column', gap: 8,
           scrollbarWidth: 'none',
+          WebkitOverflowScrolling: 'touch',
         }}>
           {filtered.map((s, i) => (
             <div key={s.id} style={{ animation: `fadeUp 0.25s ease ${i * 0.035}s both`, flexShrink: 0 }}>

@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { haversineMeters, CHECKIN_RADIUS_M } from './utils/geo';
 import { useTheme }  from './context/ThemeContext';
 import { useAuth }   from './context/AuthContext';
@@ -28,7 +28,7 @@ const S = <Loading message="Loading…" />;
 export default function App() {
   const { t }    = useTheme();
   const { loading: authLoading, user, userProfile } = useAuth();
-  const { loading: spotsLoading, spots } = useSpots();
+  const { loading: spotsLoading, spots, checkIn, checkedInId } = useSpots();
 
   const [tab,            setTab]           = useState('map');
   const [selectedSpot,   setSelectedSpot]  = useState(null);
@@ -48,6 +48,12 @@ export default function App() {
 
   const [userPos,    setUserPos]    = useState(null);
   const [nearbySpot, setNearbySpot] = useState(null);
+
+  // Keep a ref so auto-checkout effect never has stale closures
+  const checkInRef    = useRef(checkIn);
+  const checkedInIdRef = useRef(checkedInId);
+  useEffect(() => { checkInRef.current = checkIn; });
+  useEffect(() => { checkedInIdRef.current = checkedInId; });
 
   // Watch GPS position continuously
   useEffect(() => {
@@ -71,6 +77,13 @@ export default function App() {
     setNearbySpot(minDist <= CHECKIN_RADIUS_M ? closest : null);
   }, [userPos, spots]);
 
+  // Auto-checkout when the user walks away from their checked-in spot
+  useEffect(() => {
+    if (!nearbySpot && checkedInIdRef.current && userPos) {
+      checkInRef.current(checkedInIdRef.current); // toggles off
+    }
+  }, [nearbySpot, userPos]);
+
   const [guestInteractions, setGuestInteractions] = useState(0);
   const bumpGuest = () => {
     if (!user) {
@@ -81,10 +94,11 @@ export default function App() {
     }
   };
 
+  // FAB: one-tap check-in/out when near a spot; otherwise open Add Story
   const handleFAB = () => {
     if (!user) { setAuthOpen(true); return; }
     if (nearbySpot) {
-      setCheckInSpot(nearbySpot);
+      checkIn(nearbySpot.id); // toggles: checks in if not checked in, checks out if already here
     } else {
       setAddStory(true);
     }
@@ -229,7 +243,7 @@ export default function App() {
         <Suspense fallback={S}>
           <StoriesTab
             onSpotPress={handleSpotPress}
-            onAddStory={handleStoryFAB}
+            onAddStory={() => { if (!user) { setAuthOpen(true); return; } setAddStory(true); }}
             onRequireAuth={() => setAuthOpen(true)}
           />
         </Suspense>
