@@ -9,7 +9,7 @@ import { useStories } from '../context/StoriesContext';
 import SpotCard from '../components/SpotCard';
 import { BellIcon, EditIcon, SettingsIcon, PlusIcon, BackIcon } from '../components/Icons';
 
-export default function ProfileScreen({ onNavigateToAuth, onEditProfile, onSettings, onNotifications, onSpotPress, onAddSpot, onBack }) {
+export default function ProfileScreen({ onNavigateToAuth, onEditProfile, onSettings, onNotifications, onSpotPress, onAddSpot, onBack, onStoryViewer }) {
   const { t, isDark, toggleTheme } = useTheme();
   const { user, userProfile, logOut } = useAuth();
   const { checkinHistory } = useSpots();
@@ -51,12 +51,14 @@ export default function ProfileScreen({ onNavigateToAuth, onEditProfile, onSetti
 
   return (
     <div style={{ height: '100%', background: t.bg, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '60px 14px 12px', borderBottom: `1px solid ${t.border}`, background: t.surface, position: 'relative' }}>
+      <div style={{ borderBottom: `1px solid ${t.border}`, background: t.surface, position: 'relative' }}>
+        <div style={{ height: 'env(safe-area-inset-top, 44px)' }} />
         {onBack && (
-          <button onClick={onBack} style={{ position: 'absolute', top: 16, left: 14, border: 'none', background: 'transparent', cursor: 'pointer', padding: 4 }}>
+          <button onClick={onBack} style={{ position: 'absolute', top: 'env(safe-area-inset-top, 44px)', left: 14, border: 'none', background: 'transparent', cursor: 'pointer', padding: 4 }}>
             <BackIcon color={t.text} size={20} />
           </button>
         )}
+        <div style={{ padding: '16px 14px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {userProfile?.profilePhotoURL ? <img src={userProfile.profilePhotoURL} alt="profile" style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover' }} /> : <div style={{ width: 60, height: 60, borderRadius: '50%', background: t.accentBg, color: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 20 }}>{initials}</div>}
           <div style={{ flex: 1 }}>
@@ -74,6 +76,7 @@ export default function ProfileScreen({ onNavigateToAuth, onEditProfile, onSetti
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', marginTop: 10 }}>
           {stats.map((s) => <div key={s.label} style={{ textAlign: 'center' }}><div style={{ color: t.accent, fontSize: 16, fontWeight: 800 }}>{s.value}</div><div style={{ color: t.muted, fontSize: 10 }}>{s.label}</div></div>)}
         </div>
+        </div>
       </div>
 
       <div style={{ padding: 12, display: 'flex', gap: 8, borderBottom: `1px solid ${t.border}`, overflowX: 'auto' }}>
@@ -88,12 +91,17 @@ export default function ProfileScreen({ onNavigateToAuth, onEditProfile, onSetti
         {tab === 'history' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {checkinHistory.length === 0 && <div style={{ color: t.muted, fontSize: 12 }}>No check-ins yet.</div>}
-            {checkinHistory.map((c) => (
-              <div key={c.id} style={{ border: `1px solid ${t.border}`, background: t.surface, borderRadius: 10, padding: 10 }}>
-                <div style={{ fontSize: 13, color: t.text, fontWeight: 700 }}>{c.spotName || c.spotId}</div>
-                <div style={{ fontSize: 11, color: t.muted }}>{c.note || 'No note'} {c.rating ? `· ★${c.rating}` : ''}</div>
-              </div>
-            ))}
+            {checkinHistory.map((c) => {
+              const raw = c.timestamp?.toDate ? c.timestamp.toDate() : (c.timestamp instanceof Date ? c.timestamp : null);
+              const timeStr = raw ? raw.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' · ' + raw.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+              return (
+                <div key={c.id} style={{ border: `1px solid ${t.border}`, background: t.surface, borderRadius: 10, padding: 10 }}>
+                  <div style={{ fontSize: 13, color: t.text, fontWeight: 700 }}>{c.spotName || c.spotId}</div>
+                  {timeStr && <div style={{ fontSize: 10, color: t.accent, marginBottom: 2 }}>{timeStr}</div>}
+                  <div style={{ fontSize: 11, color: t.muted }}>{c.note || ''} {c.rating ? `· ★${c.rating}` : ''}</div>
+                </div>
+              );
+            })}
           </div>
         )}
         {tab === 'founded' && (
@@ -106,7 +114,7 @@ export default function ProfileScreen({ onNavigateToAuth, onEditProfile, onSetti
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {myStories.length === 0 && <div style={{ color: t.muted, fontSize: 12 }}>No active stories. Post a story at a spot!</div>}
             {myStories.map((s) => (
-              <div key={s.id} style={{ border: `1px solid ${t.border}`, background: t.surface, borderRadius: 10, padding: 10 }}>
+              <div key={s.id} onClick={() => onStoryViewer && onStoryViewer(s.spotId)} style={{ border: `1px solid ${t.border}`, background: t.surface, borderRadius: 10, padding: 10, cursor: 'pointer' }}>
                 {s.photoURL && <img src={s.photoURL} alt="" style={{ width: '100%', borderRadius: 8, maxHeight: 160, objectFit: 'cover', marginBottom: 6 }} />}
                 <div style={{ fontSize: 12, color: t.text }}>{s.caption || 'No caption'}</div>
                 <div style={{ fontSize: 10, color: t.muted, marginTop: 4 }}>

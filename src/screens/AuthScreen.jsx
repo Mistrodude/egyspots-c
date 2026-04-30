@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth }  from '../context/AuthContext';
 import { sendPasswordResetEmail } from 'firebase/auth';
@@ -12,8 +13,9 @@ const ERROR_MAP = {
   'auth/weak-password':           'Password must be at least 8 characters.',
   'auth/invalid-email':           'Please enter a valid email address.',
   'auth/too-many-requests':       'Too many attempts. Please wait a moment.',
-  'auth/network-request-failed':  'Network error. Check your connection.',
-  'auth/popup-closed-by-user':    'Sign-in popup was closed. Try again.',
+  'auth/network-request-failed':                          'Network error. Check your connection.',
+  'auth/popup-closed-by-user':                            'Sign-in popup was closed. Try again.',
+  'auth/operation-not-supported-in-this-environment':     'Use email and password to sign in on the mobile app.',
 };
 
 function parseError(e) {
@@ -34,6 +36,7 @@ const Spinner = ({ color = 'white' }) => (
 export default function AuthScreen({ onBack }) {
   const { t } = useTheme();
   const { signIn, signUp, signInGoogle, signInApple, checkUsernameAvailable } = useAuth();
+  const isNative = Capacitor.isNativePlatform();
 
   const [mode,         setMode]         = useState('signin');
   const [loading,      setLoading]      = useState(false);
@@ -125,7 +128,8 @@ export default function AuthScreen({ onBack }) {
         city,
         language,
       });
-      onBack();
+      setInfo('Account created! Check your email for a verification link, then sign in.');
+      setTimeout(() => onBack(), 3000);
     } catch (e) {
       setError(parseError(e));
     } finally {
@@ -183,7 +187,7 @@ export default function AuthScreen({ onBack }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: t.bg, overflowY: 'auto' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 24px 40px', minHeight: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 'calc(env(safe-area-inset-top, 0px) + 20px) 24px 40px', minHeight: '100%' }}>
 
         {/* Logo */}
         <div style={{
@@ -312,7 +316,10 @@ export default function AuthScreen({ onBack }) {
                   {agreedTerms && <span style={{ color: 'white', fontSize: 12, fontWeight: 800 }}>✓</span>}
                 </button>
                 <span style={{ fontSize: 12, color: t.muted, lineHeight: 1.5 }}>
-                  I agree to the <span style={{ color: t.accent, cursor: 'pointer' }}>Terms of Service</span> and <span style={{ color: t.accent, cursor: 'pointer' }}>Privacy Policy</span>
+                  I agree to the{' '}
+                  <span style={{ color: t.accent, cursor: 'pointer' }} onClick={() => window.open('https://egyspots-dc9c1.web.app/terms.html', '_blank', 'noopener')}>Terms of Service</span>
+                  {' '}and{' '}
+                  <span style={{ color: t.accent, cursor: 'pointer' }} onClick={() => window.open('https://egyspots-dc9c1.web.app/privacy.html', '_blank', 'noopener')}>Privacy Policy</span>
                 </span>
               </div>
             </>
@@ -359,15 +366,21 @@ export default function AuthScreen({ onBack }) {
             <div style={{ flex: 1, height: 1, background: t.border }} />
           </div>
 
+          {isNative && (
+            <div style={{ fontSize: 11, color: t.muted, textAlign: 'center', padding: '2px 0 4px', lineHeight: 1.5 }}>
+              Social sign-in is not available in the mobile app yet — use email and password above.
+            </div>
+          )}
+
           {/* Google */}
-          <button onClick={handleGoogle} disabled={loading} style={{
+          <button onClick={isNative ? undefined : handleGoogle} disabled={loading || isNative} style={{
             padding: 14, borderRadius: 16,
             background: t.surface, color: t.text,
             border: `1px solid ${t.border}`,
-            cursor: loading ? 'not-allowed' : 'pointer',
+            cursor: isNative ? 'default' : loading ? 'not-allowed' : 'pointer',
             fontFamily: 'Outfit, sans-serif', fontSize: 14, fontWeight: 600,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            opacity: loading ? 0.7 : 1,
+            opacity: isNative || loading ? 0.35 : 1,
           }}>
             <svg width="18" height="18" viewBox="0 0 48 48">
               <path fill="#EA4335" d="M24 9.5c3.3 0 6.3 1.1 8.7 3.3l6.5-6.5C35 2.8 29.9.5 24 .5 14.8.5 7 6.1 3.5 13.9l7.6 5.9C12.9 13.7 17.9 9.5 24 9.5z"/>
@@ -379,16 +392,16 @@ export default function AuthScreen({ onBack }) {
           </button>
 
           {/* Apple */}
-          <button onClick={handleApple} disabled={loading} style={{
+          <button onClick={isNative ? undefined : handleApple} disabled={loading || isNative} style={{
             padding: 14, borderRadius: 16,
-            background: '#000', color: '#fff',
-            border: '1px solid #000',
-            cursor: loading ? 'not-allowed' : 'pointer',
+            background: isNative ? t.surface2 : '#000', color: isNative ? t.muted : '#fff',
+            border: isNative ? `1px solid ${t.border}` : '1px solid #000',
+            cursor: isNative ? 'default' : loading ? 'not-allowed' : 'pointer',
             fontFamily: 'Outfit, sans-serif', fontSize: 14, fontWeight: 600,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            opacity: loading ? 0.7 : 1,
+            opacity: isNative || loading ? 0.35 : 1,
           }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill={isNative ? t.muted : 'white'}>
               <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
             </svg>
             Sign in with Apple

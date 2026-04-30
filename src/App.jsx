@@ -17,17 +17,17 @@ const DiscoverScreen      = lazy(() => import('./screens/DiscoverScreen'));
 const StoriesTab          = lazy(() => import('./screens/StoriesTab'));
 const StoryViewerScreen   = lazy(() => import('./screens/StoryViewerScreen'));
 const AddStoryScreen      = lazy(() => import('./screens/AddStoryScreen'));
-const CheckInModal        = lazy(() => import('./screens/CheckInModal'));
 const NotificationsScreen = lazy(() => import('./screens/NotificationsScreen'));
 const EditProfileScreen   = lazy(() => import('./screens/EditProfileScreen'));
 const SettingsScreen      = lazy(() => import('./screens/SettingsScreen'));
 const AddSpotScreen       = lazy(() => import('./screens/AddSpotScreen'));
+const EditSpotScreen      = lazy(() => import('./screens/EditSpotScreen'));
 
 const S = <Loading message="Loading…" />;
 
 export default function App() {
   const { t }    = useTheme();
-  const { loading: authLoading, user, userProfile } = useAuth();
+  const { loading: authLoading, user, userProfile, logOut } = useAuth();
   const { loading: spotsLoading, spots, checkIn, checkedInId } = useSpots();
 
   const [tab,            setTab]           = useState('map');
@@ -35,13 +35,15 @@ export default function App() {
   const [chatOpen,       setChatOpen]      = useState(false);
   const [authOpen,       setAuthOpen]      = useState(false);
   const [searchOpen,     setSearchOpen]    = useState(false);
-  const [checkInSpot,    setCheckInSpot]   = useState(null);
   const [notifOpen,      setNotifOpen]     = useState(false);
   const [editProfileOpen,setEditProfile]   = useState(false);
   const [settingsOpen,   setSettingsOpen]  = useState(false);
   const [addSpotOpen,    setAddSpot]       = useState(false);
-  const [addStoryOpen,   setAddStory]      = useState(false);
-  const [storyViewerSpotId, setStoryViewerSpotId] = useState(null);
+  const [addStoryOpen,       setAddStory]       = useState(false);
+  const [addStoryDefaultId,  setAddStoryDefaultId] = useState('');
+  const [storyViewerSpotId,  setStoryViewerSpotId] = useState(null);
+  const [editSpotOpen,       setEditSpotOpen]   = useState(false);
+  const [editSpotTarget,     setEditSpotTarget] = useState(null);
   const [onboardingDone, setOnboardingDone] = useState(
     () => localStorage.getItem('onboardingDone') === 'true'
   );
@@ -55,13 +57,13 @@ export default function App() {
   useEffect(() => { checkInRef.current = checkIn; });
   useEffect(() => { checkedInIdRef.current = checkedInId; });
 
-  // Watch GPS position continuously
+  // Watch GPS position continuously — low accuracy to save battery
   useEffect(() => {
     if (!navigator.geolocation) return;
     const watchId = navigator.geolocation.watchPosition(
       (pos) => setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       () => {},
-      { enableHighAccuracy: true, maximumAge: 10000 }
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
     );
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
@@ -85,6 +87,8 @@ export default function App() {
   }, [nearbySpot, userPos]);
 
   const [guestInteractions, setGuestInteractions] = useState(0);
+  const [toast, setToast] = useState(null);
+
   const bumpGuest = () => {
     if (!user) {
       setGuestInteractions((n) => {
@@ -94,11 +98,22 @@ export default function App() {
     }
   };
 
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  };
+
   // FAB: one-tap check-in/out when near a spot; otherwise open Add Story
-  const handleFAB = () => {
+  const handleFAB = async () => {
     if (!user) { setAuthOpen(true); return; }
     if (nearbySpot) {
-      checkIn(nearbySpot.id); // toggles: checks in if not checked in, checks out if already here
+      const alreadyCheckedIn = checkedInId === nearbySpot.id;
+      const result = await checkIn(nearbySpot.id);
+      if (result?.error === 'cooldown') {
+        showToast(`Wait ${result.minutesLeft} min — checked in recently`);
+      } else if (!alreadyCheckedIn) {
+        showToast(`Checked in to ${nearbySpot.name} ✓`);
+      }
     } else {
       setAddStory(true);
     }
@@ -116,9 +131,15 @@ export default function App() {
       <div style={{ height: '100%', background: t.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
         <div style={{ fontSize: 40, marginBottom: 16 }}>🚫</div>
         <div style={{ fontSize: 18, fontWeight: 800, color: t.text, marginBottom: 8 }}>Account Suspended</div>
-        <div style={{ fontSize: 13, color: t.muted, textAlign: 'center' }}>
+        <div style={{ fontSize: 13, color: t.muted, textAlign: 'center', marginBottom: 24 }}>
           {userProfile.banReason || 'Your account has been suspended. Contact support for help.'}
         </div>
+        <button
+          onClick={logOut}
+          style={{ border: `1px solid ${t.border}`, background: t.surface, color: t.text, borderRadius: 10, padding: '10px 24px', cursor: 'pointer', fontFamily: 'Outfit, sans-serif' }}
+        >
+          Continue as Guest
+        </button>
       </div>
     );
   }
@@ -167,7 +188,13 @@ export default function App() {
 
   if (addStoryOpen) return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: t.bg }}>
-      <Suspense fallback={S}><AddStoryScreen onClose={() => setAddStory(false)} onRequireAuth={() => { setAddStory(false); setAuthOpen(true); }} userPos={userPos} /></Suspense>
+      <Suspense fallback={S}><AddStoryScreen defaultSpotId={addStoryDefaultId} onClose={() => { setAddStory(false); setAddStoryDefaultId(''); }} onRequireAuth={() => { setAddStory(false); setAddStoryDefaultId(''); setAuthOpen(true); }} userPos={userPos} /></Suspense>
+    </div>
+  );
+
+  if (editSpotOpen && editSpotTarget) return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: t.bg }}>
+      <Suspense fallback={S}><EditSpotScreen spot={editSpotTarget} onBack={() => { setEditSpotOpen(false); setEditSpotTarget(null); }} /></Suspense>
     </div>
   );
 
@@ -181,18 +208,6 @@ export default function App() {
     </Suspense>
   );
 
-  if (checkInSpot) return (
-    <div style={{ height: '100%', background: t.bg }}>
-      <Suspense fallback={S}>
-        <CheckInModal
-          spot={checkInSpot}
-          onClose={() => setCheckInSpot(null)}
-          onSuccess={() => setCheckInSpot(null)}
-        />
-      </Suspense>
-    </div>
-  );
-
   if (chatOpen && selectedSpot) return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: t.bg }}>
       <Suspense fallback={S}><ChatScreen spot={selectedSpot} onBack={() => setChatOpen(false)} /></Suspense>
@@ -201,23 +216,24 @@ export default function App() {
 
   if (searchOpen) return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: t.bg }}>
-      <Suspense fallback={S}><SearchScreen onSpotPress={(s) => { setSearchOpen(false); setSelectedSpot(s); }} onBack={() => setSearchOpen(false)} /></Suspense>
+      <Suspense fallback={S}><SearchScreen userPos={userPos} onSpotPress={(s) => { setSearchOpen(false); setSelectedSpot(s); }} onBack={() => setSearchOpen(false)} /></Suspense>
     </div>
   );
 
   if (selectedSpot) return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: t.bg }}>
+    <div style={{ height: '100%', background: t.bg }}>
       <Suspense fallback={S}>
         <SpotDetailScreen
           spot={selectedSpot}
+          userPos={userPos}
           onBack={() => setSelectedSpot(null)}
           onOpenChat={() => setChatOpen(true)}
-          onCheckIn={() => setCheckInSpot(selectedSpot)}
           onStoryViewer={() => setStoryViewerSpotId(selectedSpot.id)}
+          onAddStory={() => { setAddStoryDefaultId(selectedSpot.id); setAddStory(true); }}
+          onEditSpot={user?.uid === selectedSpot?.founderId ? () => { setEditSpotTarget(selectedSpot); setEditSpotOpen(true); } : undefined}
           onRequireAuth={() => { setSelectedSpot(null); setAuthOpen(true); }}
         />
       </Suspense>
-      <BottomNav tab={tab} setTab={(id) => { setSelectedSpot(null); setTab(id); }} onStoryFABPress={handleFAB} nearbySpot={nearbySpot} />
     </div>
   );
 
@@ -225,6 +241,7 @@ export default function App() {
     switch (tab) {
       case 'map': return (
         <ExploreScreen
+          userPos={userPos}
           onSpotPress={handleSpotPress}
           onOpenSearch={() => setSearchOpen(true)}
           onOpenNotifications={() => { if (!user) { setAuthOpen(true); return; } setNotifOpen(true); }}
@@ -258,6 +275,7 @@ export default function App() {
             onSpotPress={handleSpotPress}
             onAddSpot={() => setAddSpot(true)}
             onBack={() => setTab('map')}
+            onStoryViewer={(spotId) => setStoryViewerSpotId(spotId)}
           />
         </Suspense>
       );
@@ -266,11 +284,24 @@ export default function App() {
   })();
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: t.bg, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: t.bg, overflow: 'hidden', position: 'relative' }}>
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         {mainScreen}
       </div>
-      <BottomNav tab={tab} setTab={setTab} onStoryFABPress={handleFAB} nearbySpot={nearbySpot} />
+      <BottomNav tab={tab} setTab={setTab} onStoryFABPress={handleFAB} nearbySpot={nearbySpot} checkedInId={checkedInId} />
+      {toast && (
+        <div style={{
+          position: 'absolute', bottom: 90, left: 16, right: 16,
+          background: t.accent, color: 'white',
+          borderRadius: 12, padding: '12px 16px',
+          textAlign: 'center', fontWeight: 700, fontSize: 14,
+          zIndex: 2000, boxShadow: '0 4px 20px rgba(0,0,0,0.35)',
+          pointerEvents: 'none',
+          animation: 'fadeUp 0.2s ease',
+        }}>
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

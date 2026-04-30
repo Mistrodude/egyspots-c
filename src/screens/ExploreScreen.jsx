@@ -5,11 +5,11 @@ import MapView from '../components/MapView';
 import SpotCard from '../components/SpotCard';
 import { CATEGORIES, filterSpots } from '../data/spots';
 import { CATEGORY_ICONS, LocateIcon, SearchIcon, ExploreIcon } from '../components/Icons';
+import { haversineMeters } from '../utils/geo';
 
-const ACTIVE_COUNT = 342;
 const PEEK_H = 210;
 
-export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) {
+export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot, userPos }) {
   const { t, isDark }  = useTheme();
   const { spots, checkedInId } = useSpots();
   const [category,     setCategory]     = useState('All');
@@ -22,6 +22,32 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
   const dragRef   = useRef(null);
 
   const filtered = useMemo(() => filterSpots(spots, category), [spots, category]);
+
+  const spotsWithDist = useMemo(() => {
+    if (!userPos) return filtered;
+    return filtered.map((s) => {
+      const dm = haversineMeters(userPos, s);
+      return {
+        ...s,
+        distanceM: dm,
+        distance: dm < 1000 ? `${Math.round(dm)}m` : `${(dm / 1000).toFixed(1)} km`,
+      };
+    }).sort((a, b) => a.distanceM - b.distanceM);
+  }, [filtered, userPos]);
+
+  // Fly to user location on first mount; also sync from App's GPS watch
+  useEffect(() => {
+    if (userPos && !userLocation) setUserLocation(userPos);
+  }, [userPos]);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { enableHighAccuracy: false, timeout: 6000, maximumAge: 30000 }
+    );
+  }, []);
 
   // Non-passive touchmove on the handle only — prevents page scroll while dragging
   useEffect(() => {
@@ -150,7 +176,7 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
         </button>
       </div>
 
-      {/* Live badge */}
+      {/* Live badge — spot count */}
       <div style={{
         position: 'absolute', left: 14, bottom: mapCtrlBottom,
         zIndex: 1200, transition: 'bottom 0.4s cubic-bezier(.32,1,.36,1)',
@@ -159,7 +185,7 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
         display: 'flex', alignItems: 'center', gap: 6,
       }}>
         <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'white', animation: 'pulse 1.5s infinite' }} />
-        <span style={{ fontSize: 10, fontWeight: 700, color: 'white' }}>{ACTIVE_COUNT} active now</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: 'white' }}>{spotsWithDist.length} spots live</span>
       </div>
 
       {/* Bottom sheet */}
@@ -189,7 +215,7 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
         >
           <div style={{ width: 36, height: 4, borderRadius: 4, background: t.border, marginBottom: 8 }} />
           <div style={{ fontSize: 11, fontWeight: 700, color: t.muted, letterSpacing: '0.8px' }}>
-            {sheetOpen ? '▾ COLLAPSE' : `▴ ${filtered.length} SPOTS NEAR YOU`}
+            {sheetOpen ? '▾ COLLAPSE' : `▴ ${spotsWithDist.length} SPOTS NEAR YOU`}
           </div>
         </div>
 
@@ -224,7 +250,7 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot }) 
           scrollbarWidth: 'none',
           WebkitOverflowScrolling: 'touch',
         }}>
-          {filtered.map((s, i) => (
+          {spotsWithDist.map((s, i) => (
             <div key={s.id} style={{ animation: `fadeUp 0.25s ease ${i * 0.035}s both`, flexShrink: 0 }}>
               <SpotCard spot={s} onPress={handleSpotPress} checkedIn={s.id === checkedInId} />
             </div>

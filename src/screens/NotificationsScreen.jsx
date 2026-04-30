@@ -27,12 +27,15 @@ export default function NotificationsScreen({ onBack, onSpotPress }) {
 
   return (
     <div style={{ height: '100%', background: t.bg, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: 12, borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button onClick={onBack} style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}><BackIcon color={t.text} size={18} /></button>
-          <div style={{ fontWeight: 700, color: t.text }}>Notifications</div>
+      <div style={{ borderBottom: `1px solid ${t.border}` }}>
+        <div style={{ height: 'env(safe-area-inset-top, 0px)' }} />
+        <div style={{ padding: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={onBack} style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}><BackIcon color={t.text} size={18} /></button>
+            <div style={{ fontWeight: 700, color: t.text }}>Notifications</div>
+          </div>
+          <button onClick={markAllRead} style={{ border: 'none', background: 'transparent', color: t.accent, cursor: 'pointer', fontFamily: 'Outfit, sans-serif' }}>Mark all read</button>
         </div>
-        <button onClick={markAllRead} style={{ border: 'none', background: 'transparent', color: t.accent, cursor: 'pointer', fontFamily: 'Outfit, sans-serif' }}>Mark all read</button>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {notifications.length === 0 ? (

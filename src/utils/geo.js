@@ -8,5 +8,6 @@ export function haversineMeters(a, b) {
   return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
-export const CHECKIN_RADIUS_M = 200;
-export const STORY_RADIUS_M   = 300;
+export const CHECKIN_RADIUS_M   = 200;
+export const STORY_RADIUS_M     = 300;
+export const MIN_SPOT_DISTANCE_M = 300;

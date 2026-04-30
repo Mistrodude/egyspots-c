@@ -24,8 +24,8 @@ export default function DiscoverScreen({ onSpotPress, onOpenSearch }) {
 
   const categoryFiltered = useMemo(() => filterSpots(spots, category), [spots, category]);
   const visited = useMemo(() => new Set((checkinHistory || []).map((c) => c.spotId)), [checkinHistory]);
-  const trending = useMemo(() => [...spots].sort((a, b) => (b.weeklyCheckins || 0) - (a.weeklyCheckins || 0)).slice(0, 8), [spots]);
-  const activeToday = useMemo(() => [...spots].sort((a, b) => (b.checkinsToday || 0) - (a.checkinsToday || 0)).slice(0, 8), [spots]);
+  const trending = useMemo(() => [...spots].sort((a, b) => ((b.weeklyCheckins || 0) + (b.crowdPct || 0) * 2 + (b.rating || 0) * 10) - ((a.weeklyCheckins || 0) + (a.crowdPct || 0) * 2 + (a.rating || 0) * 10)).slice(0, 8), [spots]);
+  const activeToday = useMemo(() => [...spots].sort((a, b) => ((b.checkinsToday || 0) + (b.crowdPct || 0)) - ((a.checkinsToday || 0) + (a.crowdPct || 0))).slice(0, 8), [spots]);
   const featured = useMemo(() => spots.filter((s) => s.isFeatured), [spots]);
   const unseen = useMemo(() => categoryFiltered.filter((s) => !visited.has(s.id)).slice(0, 10), [categoryFiltered, visited]);
   const newNearby = useMemo(() => {
@@ -39,7 +39,8 @@ export default function DiscoverScreen({ onSpotPress, onOpenSearch }) {
   }, [spots]);
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', background: t.bg, padding: '62px 14px 20px' }}>
+    <div style={{ height: '100%', overflowY: 'auto', background: t.bg, padding: '0 14px 20px' }}>
+      <div style={{ height: 'calc(env(safe-area-inset-top, 44px) + 16px)' }} />
       <button
         onClick={onOpenSearch}
         style={{
@@ -72,18 +73,20 @@ export default function DiscoverScreen({ onSpotPress, onOpenSearch }) {
         </div>
       </Section>
 
-      <Section t={t} title="Featured Vendors">
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-          {featured.map((s) => (
-            <div key={s.id} style={{ minWidth: 230, border: `1px solid ${t.border}`, background: t.surface, borderRadius: 14, padding: 12 }}>
-              <div style={{ fontSize: 10, color: t.warning, fontWeight: 700, marginBottom: 6 }}>Sponsored</div>
-              <div style={{ fontSize: 14, color: t.text, fontWeight: 700, marginBottom: 4 }}>{s.name}</div>
-              <div style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>{s.neighborhood}</div>
-              <button onClick={() => onSpotPress(s)} style={{ border: 'none', background: t.accent, color: 'white', borderRadius: 10, padding: '8px 10px', cursor: 'pointer', fontFamily: 'Outfit, sans-serif' }}>View Spot</button>
-            </div>
-          ))}
-        </div>
-      </Section>
+      {featured.length > 0 && (
+        <Section t={t} title="Featured Vendors">
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+            {featured.map((s) => (
+              <div key={s.id} style={{ minWidth: 230, border: `1px solid ${t.border}`, background: t.surface, borderRadius: 14, padding: 12 }}>
+                <div style={{ fontSize: 10, color: t.warning, fontWeight: 700, marginBottom: 6 }}>Sponsored</div>
+                <div style={{ fontSize: 14, color: t.text, fontWeight: 700, marginBottom: 4 }}>{s.name}</div>
+                <div style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>{s.neighborhood}</div>
+                <button onClick={() => onSpotPress(s)} style={{ border: 'none', background: t.accent, color: 'white', borderRadius: 10, padding: '8px 10px', cursor: 'pointer', fontFamily: 'Outfit, sans-serif' }}>View Spot</button>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
       <Section t={t} title="Browse by Category">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>

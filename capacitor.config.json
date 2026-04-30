@@ -1,0 +1,6 @@
+{
+  "appId": "com.egyspots.app",
+  "appName": "EgySpots",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}

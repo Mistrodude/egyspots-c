@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -29,7 +30,12 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
+    // Safety net: if onAuthStateChanged never fires (e.g. Firebase hangs on
+    // WKWebView), unblock the loading screen after 6 seconds.
+    const fallback = setTimeout(() => setLoading(false), 3000);
+
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      clearTimeout(fallback);
       if (firebaseUser) {
         const profile = await loadProfile(firebaseUser.uid);
 
@@ -69,7 +75,7 @@ export function AuthProvider({ children }) {
             createdAt:  serverTimestamp(),
             lastLoginAt: serverTimestamp(),
           };
-          await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
+          setDoc(doc(db, 'users', firebaseUser.uid), newProfile).catch(() => {});
           setUserProfile(newProfile);
         } else {
           // Update lastLoginAt
@@ -86,7 +92,7 @@ export function AuthProvider({ children }) {
       }
       setLoading(false);
     });
-    return unsub;
+    return () => { unsub(); clearTimeout(fallback); };
   }, []);
 
   const signIn = (email, password) =>
@@ -131,15 +137,21 @@ export function AuthProvider({ children }) {
       lastLoginAt: serverTimestamp(),
     };
 
-    await setDoc(doc(db, 'users', cred.user.uid), profile);
+    // Fire-and-forget: don't await Firestore — if it hangs (offline/slow),
+    // Auth already succeeded and the user can use the app. Profile syncs when online.
+    setDoc(doc(db, 'users', cred.user.uid), profile).catch(() => {});
 
-    // Send email verification
     try { await sendEmailVerification(cred.user); } catch (_) {}
 
     return cred;
   };
 
-  const signInGoogle = () => signInWithPopup(auth, googleProvider);
+  const signInGoogle = () => {
+    if (Capacitor.isNativePlatform()) {
+      return Promise.reject(Object.assign(new Error('Google sign-in is not supported in the mobile app yet — please use email and password.'), { code: 'auth/operation-not-supported-in-this-environment' }));
+    }
+    return signInWithPopup(auth, googleProvider);
+  };
 
   const logOut = () => signOut(auth);
 
@@ -172,7 +184,18 @@ export function AuthProvider({ children }) {
     setUserProfile(fresh);
   };
 
+  const toggleSaveSpot = async (spotId) => {
+    if (!user) return;
+    const saved = userProfile?.savedSpots || [];
+    const next = saved.includes(spotId) ? saved.filter((id) => id !== spotId) : [...saved, spotId];
+    setUserProfile((p) => ({ ...p, savedSpots: next }));
+    updateDoc(doc(db, 'users', user.uid), { savedSpots: next }).catch(() => {});
+  };
+
   const signInApple = async () => {
+    if (Capacitor.isNativePlatform()) {
+      throw Object.assign(new Error('Apple sign-in is not supported in the mobile app yet — please use email and password.'), { code: 'auth/operation-not-supported-in-this-environment' });
+    }
     const { OAuthProvider, signInWithPopup: signinPopup } = await import('firebase/auth');
     const provider = new OAuthProvider('apple.com');
     provider.addScope('email');
@@ -185,7 +208,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       user, userProfile, loading,
       signIn, signUp, signInGoogle, signInApple, logOut,
-      checkUsernameAvailable, updateUserProfile, refreshProfile,
+      checkUsernameAvailable, updateUserProfile, refreshProfile, toggleSaveSpot,
     }}>
       {children}
     </AuthContext.Provider>

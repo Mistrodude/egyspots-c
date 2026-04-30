@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase';
 import { useTheme } from '../context/ThemeContext';
@@ -11,6 +11,10 @@ export default function EditProfileScreen({ onBack }) {
   const { t } = useTheme();
   const { user, userProfile, updateUserProfile, checkUsernameAvailable } = useAuth();
   const fileRef = useRef(null);
+  const blobUrlRef = useRef(null);
+
+  useEffect(() => () => { if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current); }, []);
+
   const [form, setForm] = useState({
     profilePhotoURL: userProfile?.profilePhotoURL || '',
     displayName: userProfile?.displayName || '',
@@ -27,7 +31,9 @@ export default function EditProfileScreen({ onBack }) {
   const onPickFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setForm((f) => ({ ...f, profilePhotoURL: URL.createObjectURL(file) }));
+    if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+    blobUrlRef.current = URL.createObjectURL(file);
+    setForm((f) => ({ ...f, profilePhotoURL: blobUrlRef.current }));
   };
 
   const checkUsername = async () => {
@@ -54,9 +60,12 @@ export default function EditProfileScreen({ onBack }) {
 
   return (
     <div style={{ height: '100%', background: t.bg, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: 12, borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <button onClick={onBack} style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}><BackIcon color={t.text} size={18} /></button>
-        <div style={{ fontSize: 16, fontWeight: 700, color: t.text }}>Edit Profile</div>
+      <div style={{ borderBottom: `1px solid ${t.border}` }}>
+        <div style={{ height: 'env(safe-area-inset-top, 0px)' }} />
+        <div style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={onBack} style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}><BackIcon color={t.text} size={18} /></button>
+          <div style={{ fontSize: 16, fontWeight: 700, color: t.text }}>Edit Profile</div>
+        </div>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
         {/* Avatar — tap to pick photo */}

@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../firebase';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useSpots } from '../context/SpotsContext';
 import { BackIcon } from '../components/Icons';
 import { CATEGORIES, SPOT_TAGS, SPOT_TAG_LABELS } from '../data/spots';
+import { haversineMeters, MIN_SPOT_DISTANCE_M } from '../utils/geo';
 
 const SPOT_CATEGORIES = CATEGORIES.filter((c) => c !== 'All');
 
@@ -19,12 +22,28 @@ const CATEGORY_VALUES = {
 export default function AddSpotScreen({ onBack, onRequireAuth, userPos }) {
   const { t } = useTheme();
   const { user, userProfile } = useAuth();
+  const { spots } = useSpots();
+  const fileRef    = useRef(null);
+  const blobRef    = useRef(null);
+  useEffect(() => () => { if (blobRef.current) URL.revokeObjectURL(blobRef.current); }, []);
+
   const [form, setForm] = useState({
     name: '', nameAr: '', category: 'hangout', description: '',
     address: '', isMobile: false, tags: [],
   });
+  const [coverFile,    setCoverFile]    = useState(null);
+  const [coverPreview, setCoverPreview] = useState('');
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const onPickCover = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (blobRef.current) URL.revokeObjectURL(blobRef.current);
+    blobRef.current = URL.createObjectURL(file);
+    setCoverFile(file);
+    setCoverPreview(blobRef.current);
+  };
 
   if (!user) {
     return (
@@ -40,9 +59,23 @@ export default function AddSpotScreen({ onBack, onRequireAuth, userPos }) {
     if (!userPos) { setMsg('GPS required — we need your location to pin this spot on the map.'); return; }
     if (!form.name.trim()) { setMsg('Spot name is required.'); return; }
     if (!form.address.trim()) { setMsg('Address is required.'); return; }
+    const tooClose = spots.find((s) => haversineMeters(userPos, s) < MIN_SPOT_DISTANCE_M);
+    if (tooClose) {
+      setMsg(`Too close to "${tooClose.name}" — spots must be at least 300m apart.`);
+      return;
+    }
     setLoading(true);
     setMsg('');
     try {
+      // Upload cover photo first (if chosen)
+      let coverPhotoURL = '';
+      if (coverFile) {
+        const tempPath = `spots/pending/${user.uid}_${Date.now()}.jpg`;
+        const sRef = ref(storage, tempPath);
+        await uploadBytes(sRef, coverFile, { contentType: coverFile.type || 'image/jpeg' });
+        coverPhotoURL = await getDownloadURL(sRef);
+      }
+
       await addDoc(collection(db, 'spots'), {
         name:          form.name.trim(),
         nameAr:        form.nameAr.trim() || null,
@@ -57,7 +90,7 @@ export default function AddSpotScreen({ onBack, onRequireAuth, userPos }) {
         founderName:   userProfile?.displayName || user.displayName || 'User',
         status:        'active',
         photoURLs:     [],
-        coverPhotoURL: '',
+        coverPhotoURL,
         checkins:      0,
         totalCheckins: 0,
         checkinsToday: 0,
@@ -84,9 +117,12 @@ export default function AddSpotScreen({ onBack, onRequireAuth, userPos }) {
 
   return (
     <div style={{ height: '100%', background: t.bg, display: 'flex', flexDirection: 'column', fontFamily: 'Outfit, sans-serif' }}>
-      <div style={{ padding: '52px 12px 12px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <button onClick={onBack} style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}><BackIcon color={t.text} size={18} /></button>
-        <div style={{ color: t.text, fontWeight: 700, fontSize: 16 }}>Add a Spot</div>
+      <div style={{ borderBottom: `1px solid ${t.border}` }}>
+        <div style={{ height: 'env(safe-area-inset-top, 44px)' }} />
+        <div style={{ padding: '12px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={onBack} style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}><BackIcon color={t.text} size={18} /></button>
+          <div style={{ color: t.text, fontWeight: 700, fontSize: 16 }}>Add a Spot</div>
+        </div>
       </div>
 
       {/* GPS status banner */}
@@ -105,6 +141,19 @@ export default function AddSpotScreen({ onBack, onRequireAuth, userPos }) {
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Cover photo picker */}
+        <div
+          onClick={() => fileRef.current?.click()}
+          style={{ position: 'relative', width: '100%', height: 120, borderRadius: 12, overflow: 'hidden', background: t.surface, border: `1.5px dashed ${t.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          {coverPreview
+            ? <img src={coverPreview} alt="cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <div style={{ textAlign: 'center', color: t.muted, fontSize: 12 }}><div style={{ fontSize: 24, marginBottom: 4 }}>📷</div>Add Cover Photo (optional)</div>
+          }
+          {coverPreview && <div style={{ position: 'absolute', bottom: 6, right: 6, background: t.accent, borderRadius: 16, padding: '3px 8px', fontSize: 10, color: 'white', fontWeight: 700 }}>Change</div>}
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onPickCover} />
+        </div>
+
         <Label t={t} text="Spot Name *">
           <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Roadster Meet" style={inp(t)} />
         </Label>

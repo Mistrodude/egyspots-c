@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useSpots } from '../context/SpotsContext';
@@ -22,6 +22,8 @@ export default function AddStoryScreen({ onClose, onRequireAuth, defaultSpotId, 
   const [loading,    setLoading]    = useState(false);
   const [error,      setError]      = useState('');
 
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+
   if (!user) {
     onRequireAuth();
     return null;
@@ -30,6 +32,7 @@ export default function AddStoryScreen({ onClose, onRequireAuth, defaultSpotId, 
   const handleFileChange = (e) => {
     const f = e.target.files[0];
     if (!f) return;
+    if (preview) URL.revokeObjectURL(preview);
     setPhoto(f);
     setPreview(URL.createObjectURL(f));
     setStep(2);
@@ -67,6 +70,19 @@ export default function AddStoryScreen({ onClose, onRequireAuth, defaultSpotId, 
         viewCount:    0,
         viewedBy:     [],
       });
+
+      // Notify spot founder (fire-and-forget)
+      if (spot?.founderId && spot.founderId !== user.uid) {
+        addDoc(collection(db, 'notifications'), {
+          toUserId:  spot.founderId,
+          type:      'new_story',
+          title:     `New story at ${spot.name}`,
+          body:      `${userProfile?.displayName || 'Someone'} posted a story`,
+          data:      { spotId },
+          isRead:    false,
+          createdAt: now,
+        }).catch(() => {});
+      }
 
       onClose();
     } catch (e) {

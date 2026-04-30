@@ -1,15 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <script>
+      function showErr(color, text) {
+        var d = document.createElement('div');
+        d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:#0d0b14;color:' + color + ';padding:24px;font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;z-index:99999;overflow:auto;';
+        d.textContent = text;
+        if (document.body) document.body.appendChild(d);
+        else document.addEventListener('DOMContentLoaded', function(){ document.body.appendChild(d); });
+      }
+      window.addEventListener('error', function(e) {
+        // "Script error." with no file/line = cross-origin error (Firebase auth iframe).
+        // Non-fatal — Firebase handles it internally. Don't crash the app over it.
+        if (!e.message || e.message === 'Script error.' || (!e.filename && e.lineno === 0)) return;
+        var msg = e.message || 'unknown error';
+        var stack = e.error && e.error.stack ? e.error.stack : 'no stack';
+        showErr('#ff6b6b', 'JS ERROR:\n' + msg + '\n\nFile: ' + (e.filename||'?') + '\nLine: ' + e.lineno + ':' + e.colno + '\n\nStack:\n' + stack);
+      }, true);
+      window.addEventListener('unhandledrejection', function(e) {
+        var r = e.reason;
+        var text = r ? (r.stack || r.message || String(r)) : String(e);
+        showErr('#ffaa00', 'UNHANDLED REJECTION:\n' + text);
+      });
+      var _ce = console.error.bind(console);
+      console.error = function() {
+        var msg = Array.prototype.slice.call(arguments).join(' ');
+        if (msg && !msg.includes('Warning:') && !msg.includes('validateDOMNesting')) {
+          showErr('#ff9900', 'CONSOLE ERROR:\n' + msg);
+        }
+        _ce.apply(console, arguments);
+      };
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#0D0B14" />
     <title>EgySpots</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link href="https://api.mapbox.com/mapbox-gl-js/v3.12.0/mapbox-gl.css" rel="stylesheet" />
   </head>
   <body>
     <div id="root"></div>

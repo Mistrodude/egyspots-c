@@ -49,9 +49,12 @@ export default function SettingsScreen({ onBack, onRequireAuth }) {
 
   return (
     <div style={{ height: '100%', background: t.bg, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: 12, borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <button onClick={onBack} style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}><BackIcon color={t.text} size={18} /></button>
-        <div style={{ fontWeight: 700, color: t.text }}>Settings</div>
+      <div style={{ borderBottom: `1px solid ${t.border}`, background: t.bg }}>
+        <div style={{ height: 'env(safe-area-inset-top, 0px)' }} />
+        <div style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={onBack} style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}><BackIcon color={t.text} size={18} /></button>
+          <div style={{ fontWeight: 700, color: t.text }}>Settings</div>
+        </div>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <Card t={t} title="Account">

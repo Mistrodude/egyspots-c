@@ -8,7 +8,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/Avatar';
 import { SpotIcon, BackIcon, MoreIcon, SendIcon, CameraIcon } from '../components/Icons';
-import { STORIES } from '../data/mockData';
+import { useStories } from '../context/StoriesContext';
 
 function getInitials(name = '') {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || '??';
@@ -17,6 +17,8 @@ function getInitials(name = '') {
 export default function ChatScreen({ spot, onBack }) {
   const { t }    = useTheme();
   const { user } = useAuth();
+  const { storiesBySpot } = useStories();
+  const spotStories = storiesBySpot[spot?.id] || [];
   const [messages, setMessages] = useState([]);
   const [input,    setInput]    = useState('');
   const bottomRef = useRef(null);
@@ -61,7 +63,9 @@ export default function ChatScreen({ spot, onBack }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: t.bg }} className="anim-slideInRight">
 
       {/* Header */}
-      <div style={{ background: t.surface, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: `1px solid ${t.border}`, flexShrink: 0 }}>
+      <div style={{ background: t.surface, borderBottom: `1px solid ${t.border}`, flexShrink: 0 }}>
+        <div style={{ height: 'env(safe-area-inset-top, 0px)' }} />
+        <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}>
           <BackIcon color={t.text} size={20} />
         </button>
@@ -73,25 +77,32 @@ export default function ChatScreen({ spot, onBack }) {
           <div style={{ fontSize: 10, color: '#4A9E6B', fontWeight: 600 }}>● {spot.checkins} people here</div>
         </div>
         <MoreIcon color={t.muted} size={20} />
+        </div>
       </div>
 
       {/* Stories bar */}
       <div style={{ padding: '10px 12px', borderBottom: `1px solid ${t.border}`, background: t.surface, flexShrink: 0 }}>
         <div style={{ display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none' }}>
-          {STORIES.map((s) => (
-            <div key={s.id} style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-              <div style={{ width: 44, height: 44, borderRadius: '50%', padding: 2, background: s.seen ? t.border : `linear-gradient(135deg, ${t.accent}, #E07A5F)` }}>
-                <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: t.surface, padding: 2 }}>
-                  <Avatar initials={s.avatar} size={36} color={t.accent} bg={t.accentBg} />
+          {spotStories.map((s) => {
+            const seen = (s.viewedBy || []).includes(user?.uid);
+            const initials = (s.userName || '?')[0].toUpperCase();
+            return (
+              <div key={s.id} style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                <div style={{ width: 44, height: 44, borderRadius: '50%', padding: 2, background: seen ? t.border : `linear-gradient(135deg, ${t.accent}, #E07A5F)` }}>
+                  <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: t.surface, padding: 2 }}>
+                    {s.userPhotoURL
+                      ? <img src={s.userPhotoURL} alt={initials} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                      : <Avatar initials={initials} size={36} color={t.accent} bg={t.accentBg} />
+                    }
+                  </div>
                 </div>
+                <span style={{ fontSize: 8, color: t.muted }}>{(s.userName || '?').split(' ')[0]}</span>
               </div>
-              <span style={{ fontSize: 8, color: t.muted }}>{s.user.split(' ')[0]}</span>
-            </div>
-          ))}
-          <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-            <div style={{ width: 44, height: 44, borderRadius: '50%', border: `2px dashed ${t.accent}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: t.accent, cursor: 'pointer' }}>+</div>
-            <span style={{ fontSize: 8, color: t.muted }}>Add</span>
-          </div>
+            );
+          })}
+          {spotStories.length === 0 && (
+            <span style={{ fontSize: 11, color: t.muted, alignSelf: 'center' }}>No stories yet</span>
+          )}
         </div>
       </div>
 
@@ -101,6 +112,11 @@ export default function ChatScreen({ spot, onBack }) {
           Tonight · {spot.name}
         </div>
 
+        {messages.length === 0 && (
+          <div style={{ textAlign: 'center', color: t.muted, fontSize: 12, padding: '32px 0' }}>
+            No messages yet — be the first to say something!
+          </div>
+        )}
         {messages.map((m) => {
           const isMe = m.userId === myUid;
           return (

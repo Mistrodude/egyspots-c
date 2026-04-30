@@ -11,32 +11,43 @@ import { useAuth } from './AuthContext';
 const SpotsContext = createContext(null);
 
 const MAX_CHECKINS_PER_HOUR = 5;
-const CHECKIN_COOLDOWN_MINUTES = 30;
+const CHECKIN_COOLDOWN_MINUTES = 5;
 
 export function SpotsProvider({ children }) {
   const { user, userProfile } = useAuth();
   const [spots,       setSpots]       = useState(SPOTS_SEED);
   const [checkedInId, setCheckedInId] = useState(null);
-  const [loading,     setLoading]     = useState(true);
+  const [loading,     setLoading]     = useState(false); // SPOTS_SEED pre-loaded; Firestore updates in background
   const [checkinHistory, setCheckinHistory] = useState([]);
 
-  // Seed spots atomically if Firestore collection is empty.
-  // writeBatch ensures a single onSnapshot update (no partial flicker).
+  // Seed or migrate spot documents
   useEffect(() => {
-    const seedIfEmpty = async () => {
+    const syncSeeds = async () => {
       try {
         const snap = await getDocs(collection(db, 'spots'));
-        if (!snap.empty) return;
         const batch = writeBatch(db);
-        SPOTS_SEED.forEach((s) => {
-          batch.set(doc(db, 'spots', s.id), { ...s, createdAt: serverTimestamp() });
-        });
+        if (snap.empty) {
+          SPOTS_SEED.forEach((s) => {
+            batch.set(doc(db, 'spots', s.id), { ...s, createdAt: serverTimestamp() });
+          });
+        } else {
+          // Back-fill description / operatingHours on seed docs that predate those fields
+          snap.docs.forEach((d) => {
+            const data = d.data();
+            const seed = SPOTS_SEED.find((s) => s.id === d.id);
+            if (!seed) return;
+            const update = {};
+            if (!data.description && seed.description) update.description = seed.description;
+            if (!data.operatingHours && seed.operatingHours) update.operatingHours = seed.operatingHours;
+            if (Object.keys(update).length > 0) batch.update(d.ref, update);
+          });
+        }
         await batch.commit();
       } catch (e) {
-        console.warn('Firestore seed skipped:', e.message);
+        console.warn('Firestore sync:', e.message);
       }
     };
-    seedIfEmpty();
+    syncSeeds();
   }, []);
 
   // Real-time spots listener
@@ -89,6 +100,20 @@ export function SpotsProvider({ children }) {
 
   const checkIn = useCallback(async (spotId, options = {}) => {
     const isLeaving = checkedInId === spotId;
+
+    // Spam guard: same-spot re-checkin within cooldown window
+    if (!isLeaving && user) {
+      const lastAtSpot = checkinHistory.find((c) => c.spotId === spotId);
+      if (lastAtSpot) {
+        const ts = lastAtSpot.timestamp;
+        const lastMs = ts instanceof Date ? ts.getTime() : ts?.toDate ? ts.toDate().getTime() : null;
+        if (lastMs && Date.now() - lastMs < CHECKIN_COOLDOWN_MINUTES * 60 * 1000) {
+          const minutesLeft = Math.ceil((CHECKIN_COOLDOWN_MINUTES * 60 * 1000 - (Date.now() - lastMs)) / 60000);
+          return { success: false, error: 'cooldown', minutesLeft };
+        }
+      }
+    }
+
     const newId = isLeaving ? null : spotId;
     setCheckedInId(newId);
 
@@ -122,7 +147,21 @@ export function SpotsProvider({ children }) {
           location:    options.location || null,
           timestamp:   serverTimestamp(),
         };
-        await addDoc(collection(db, 'checkins'), checkinData);
+        const checkinRef = await addDoc(collection(db, 'checkins'), checkinData);
+        setCheckinHistory((prev) => [{ id: checkinRef.id, ...checkinData, timestamp: new Date() }, ...prev]);
+
+        // Notify spot founder (fire-and-forget)
+        if (spot?.founderId && spot.founderId !== user.uid) {
+          addDoc(collection(db, 'notifications'), {
+            toUserId:     spot.founderId,
+            type:         'checkin_at_your_spot',
+            title:        `New check-in at ${spot.name}`,
+            body:         `${userProfile?.displayName || userProfile?.username || 'Someone'} just checked in`,
+            data:         { spotId },
+            isRead:       false,
+            createdAt:    serverTimestamp(),
+          }).catch(() => {});
+        }
 
         await updateDoc(doc(db, 'spots', spotId), {
           checkins:     increment(1),

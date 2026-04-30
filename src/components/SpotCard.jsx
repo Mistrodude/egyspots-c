@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import CrowdBadge from './CrowdBadge';
+import { getOpenStatus } from '../utils/openStatus';
 
 const CATEGORY_COLORS = {
   hangout:     '#A78BFA',
@@ -10,10 +11,18 @@ const CATEGORY_COLORS = {
   open_air:    '#3B82F6',
 };
 
+const CATEGORY_EMOJI = {
+  hangout:     '☕',
+  car_meet:    '🚗',
+  street_cart: '🍔',
+  pop_up:      '🎪',
+  open_air:    '🌿',
+};
+
 function SpotCard({ spot, onPress, checkedIn }) {
   const { t } = useTheme();
   const color    = spot.color || CATEGORY_COLORS[spot.category] || '#A78BFA';
-  const photoUrl = spot.coverPhotoURL || `https://picsum.photos/seed/${spot.id}/200/150`;
+  const openStatus = getOpenStatus(spot.operatingHours);
 
   return (
     <div
@@ -25,17 +34,16 @@ function SpotCard({ spot, onPress, checkedIn }) {
         border: checkedIn ? `1.5px solid ${color}` : `1px solid ${t.border}`,
       }}
     >
-      {/* Cover photo */}
+      {/* Cover photo / color placeholder */}
       <div style={{
         width: 72, height: 56, borderRadius: 10, overflow: 'hidden',
-        flexShrink: 0, background: `${color}22`,
+        flexShrink: 0, background: `linear-gradient(135deg, ${color}55, ${color}22)`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <img
-          src={photoUrl}
-          alt={spot.name}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          loading="lazy"
-        />
+        {spot.coverPhotoURL
+          ? <img src={spot.coverPhotoURL} alt={spot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+          : <span style={{ fontSize: 22 }}>{CATEGORY_EMOJI[spot.category] || '📍'}</span>
+        }
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -61,6 +69,11 @@ function SpotCard({ spot, onPress, checkedIn }) {
           </span>
           <CrowdBadge crowd={spot.crowd} />
         </div>
+        {openStatus && (
+          <span style={{ fontSize: 9, fontWeight: 700, color: openStatus.isOpen ? '#22c55e' : '#ef4444', marginTop: 2 }}>
+            {openStatus.label}
+          </span>
+        )}
       </div>
 
       <div style={{ textAlign: 'right', flexShrink: 0 }}>

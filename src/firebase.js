@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { initializeAuth, inMemoryPersistence, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
@@ -14,7 +14,11 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-export const auth    = getAuth(app);
+// initializeAuth (not getAuth) sets persistence BEFORE Firebase starts its
+// internal queue. getAuth() immediately begins IndexedDB/localStorage init and
+// queues every subsequent operation (including sign-in) behind it — that's what
+// causes the infinite hang in WKWebView on iOS.
+export const auth    = initializeAuth(app, { persistence: inMemoryPersistence });
 export const db      = getFirestore(app);
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();

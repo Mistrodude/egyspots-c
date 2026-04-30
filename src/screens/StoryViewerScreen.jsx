@@ -17,6 +17,7 @@ export default function StoryViewerScreen({ spotId, initialIndex = 0, onClose, o
   const [progress, setProgress] = useState(0);
   const [reportTarget, setReportTarget] = useState(null);
   const intervalRef = useRef(null);
+  const touchStartRef = useRef({ x: 0, y: 0, time: 0 });
   const current = stories[idx];
 
   const advance = useCallback(() => {
@@ -55,10 +56,27 @@ export default function StoryViewerScreen({ spotId, initialIndex = 0, onClose, o
     return `${Math.floor(diff / 60)}h ago`;
   };
 
+  const handleTouchStart = (e) => {
+    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() };
+  };
+
+  const handleTouchEnd = (e) => {
+    const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
+    const dy = e.changedTouches[0].clientY - touchStartRef.current.y;
+    const dt = Date.now() - touchStartRef.current.time;
+    if (dy > 80 && Math.abs(dy) > Math.abs(dx)) {
+      onClose();
+    } else if (dt < 300 && Math.abs(dx) < 20 && Math.abs(dy) < 20) {
+      if (touchStartRef.current.x < window.innerWidth / 2) setIdx((i) => Math.max(0, i - 1));
+      else advance();
+    }
+  };
+
   return (
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 9000, background: '#000', fontFamily: 'Outfit, sans-serif' }}
-      onTouchStart={(e) => { e.touches[0].clientX < window.innerWidth / 2 ? setIdx((i) => Math.max(0, i - 1)) : advance(); }}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
       {/* Photo */}
       {current.photoURL
@@ -70,7 +88,7 @@ export default function StoryViewerScreen({ spotId, initialIndex = 0, onClose, o
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.7) 100%)' }} />
 
       {/* Progress bars */}
-      <div style={{ position: 'absolute', top: 50, left: 12, right: 12, display: 'flex', gap: 3, zIndex: 10 }}>
+      <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 44px) + 8px)', left: 12, right: 12, display: 'flex', gap: 3, zIndex: 10 }}>
         {stories.map((_, i) => (
           <div key={i} style={{ flex: 1, height: 2.5, background: 'rgba(255,255,255,0.3)', borderRadius: 2, overflow: 'hidden' }}>
             <div style={{
@@ -83,7 +101,7 @@ export default function StoryViewerScreen({ spotId, initialIndex = 0, onClose, o
       </div>
 
       {/* Top bar */}
-      <div style={{ position: 'absolute', top: 64, left: 12, right: 12, display: 'flex', alignItems: 'center', gap: 8, zIndex: 10 }}>
+      <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 44px) + 22px)', left: 12, right: 12, display: 'flex', alignItems: 'center', gap: 8, zIndex: 10 }}>
         <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'white' }}>
           {(current.userName || '?')[0].toUpperCase()}
         </div>

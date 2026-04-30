@@ -1,6 +1,6 @@
 # AI Handoff — EgySpots (Read This First, Every Session)
 
-Last updated: 2026-04-25
+Last updated: 2026-04-30 (session 7)
 
 ---
 
@@ -13,7 +13,7 @@ Think "Snapchat Maps meets street culture." Core loop: open map → see what's l
 **Firebase project:** `egyspots-dc9c1`
 **GitHub:** `https://github.com/Mistrodude/egyspots-c`
 **Branch:** `main`
-**Local path:** `c:\Users\Excellent Store\OneDrive\Desktop\projects\egyspots claud\`
+**Local path (Mac):** `/Users/mohamedkamel/Desktop/egyspots-c`
 
 ---
 
@@ -25,7 +25,7 @@ Think "Snapchat Maps meets street culture." Core loop: open map → see what's l
 | Styling | Inline styles only | All styles are inline JS objects using theme tokens from `src/theme.js` via `useTheme()`. Zero CSS classes, zero Tailwind. |
 | Maps | Leaflet + CARTO tiles | Free. Dark tiles: `cartocdn.com/dark_all`. Light: OpenStreetMap. No Mapbox. |
 | Backend | Firebase (`egyspots-dc9c1`) | Firestore, Auth (email + Google + Apple), Storage. Spark (free) tier. |
-| Mobile | Capacitor v8 | Config: `capacitor.config.js` (CommonJS, NOT TypeScript). |
+| Mobile | Capacitor v8 | Config: `capacitor.config.json`. |
 | State | React Context API | 5 contexts: `AuthContext`, `SpotsContext`, `ThemeContext`, `NotificationsContext`, `StoriesContext`. |
 | Tests | Vitest + @testing-library/react | 49/49 passing. Config: `vitest.config.js`. |
 | Font | Outfit (Google Fonts) | `fontFamily: 'Outfit, sans-serif'` everywhere. |
@@ -59,7 +59,7 @@ Old categories `'Cafe'`, `'coffee'`, `'food'`, `'Traditional'` are **removed**. 
 ## File Structure (current)
 
 ```
-egyspots claud/
+egyspots-c/
 ├── src/
 │   ├── App.jsx                      # Root shell — overlay priority stack + tab routing
 │   ├── main.jsx                     # Entry: ThemeProvider > AuthProvider > SpotsProvider > NotificationsProvider > StoriesProvider > App
@@ -68,70 +68,74 @@ egyspots claud/
 │   ├── index.css                    # Global resets + Outfit font + keyframe animations
 │   │
 │   ├── context/
-│   │   ├── AuthContext.jsx          # Auth state + signIn/signUp/signInGoogle/signInApple/logOut/updateUserProfile
+│   │   ├── AuthContext.jsx          # Auth state + signIn/signUp/signInGoogle/signInApple/logOut/updateUserProfile/toggleSaveSpot
 │   │   ├── SpotsContext.jsx         # Firestore spots listener + checkIn() + submitReport() + checkinHistory
 │   │   ├── ThemeContext.jsx         # Dark/light toggle; exposes t (tokens), isDark, toggleTheme
 │   │   ├── NotificationsContext.jsx # Listens to notifications/{id}; exposes unreadCount, markRead, markAllRead
-│   │   └── StoriesContext.jsx       # Listens to stories where expiresAt > now; MOCK_STORIES_LIVE as initial state
+│   │   └── StoriesContext.jsx       # Listens to stories where expiresAt > now; storiesBySpot map
 │   │
 │   ├── utils/
-│   │   └── geo.js                   # haversineMeters(a,b), CHECKIN_RADIUS_M=200, STORY_RADIUS_M=300
+│   │   ├── geo.js                   # haversineMeters(a,b), CHECKIN_RADIUS_M=200, STORY_RADIUS_M=300, MIN_SPOT_DISTANCE_M=300
+│   │   └── openStatus.js            # getOpenStatus(operatingHours) → {isOpen, label} | null; DEFAULT_HOURS()
 │   │
 │   ├── screens/
 │   │   ├── ExploreScreen.jsx        # Map tab — Leaflet map + draggable bottom sheet + category pills
 │   │   ├── DiscoverScreen.jsx       # Explore tab — trending/active/new spots discovery feed
 │   │   ├── StoriesTab.jsx           # Stories tab — horizontal story rings + spot grid
-│   │   ├── StoryViewerScreen.jsx    # Full-screen story viewer with progress bars
-│   │   ├── AddStoryScreen.jsx       # Post a story — photo picker + spot selector + proximity check
-│   │   ├── SpotDetailScreen.jsx     # Spot detail — hero, stories bar, founder, tags, report modal
+│   │   ├── StoryViewerScreen.jsx    # Full-screen story viewer with progress bars + swipe-down to close
+│   │   ├── AddStoryScreen.jsx       # Post a story — photo picker + spot selector + proximity check + notifies founder
+│   │   ├── SpotDetailScreen.jsx     # Spot detail — hero, stories bar, founder, tags, gallery+lightbox, rating, report
 │   │   ├── ChatScreen.jsx           # Full-screen spot chat (spots/{spotId}/messages subcollection)
-│   │   ├── SearchScreen.jsx         # Search overlay
-│   │   ├── ProfileScreen.jsx        # User profile — real stats, stories tab, check-in history
+│   │   ├── SearchScreen.jsx         # Search overlay with nearby/popular filters
+│   │   ├── ProfileScreen.jsx        # User profile — stats, check-in history (with timestamps), stories (tap-to-view), founded spots
 │   │   ├── AuthScreen.jsx           # Sign in / Sign up + Google + Apple
 │   │   ├── OnboardingScreen.jsx     # 3-slide onboarding (shown once, stored in localStorage)
-│   │   ├── CheckInModal.jsx         # Multi-step check-in modal (used from SpotDetailScreen only)
-│   │   ├── NotificationsScreen.jsx  # In-app notifications
-│   │   ├── EditProfileScreen.jsx    # Edit profile — uploads photo to Firebase Storage
+│   │   ├── NotificationsScreen.jsx  # In-app notifications (checkin_at_your_spot, new_story types)
+│   │   ├── EditProfileScreen.jsx    # Edit profile — uploads photo to Firebase Storage; blob URL cleanup
 │   │   ├── SettingsScreen.jsx       # Settings — theme, legal, delete account
-│   │   └── AddSpotScreen.jsx        # Create a new spot — GPS-locked, pins at user location
+│   │   ├── AddSpotScreen.jsx        # Create a new spot — GPS-locked, cover photo upload, 300m min distance
+│   │   └── EditSpotScreen.jsx       # Edit spot (founders only) — all fields + operating hours editor + delete with confirm
 │   │
 │   ├── components/
-│   │   ├── MapView.jsx              # Leaflet map — dark bg, spot markers, story rings, user dot
-│   │   ├── SpotCard.jsx             # Spot list card — Picsum photo fallback + category color fallback
-│   │   ├── BottomNav.jsx            # 4 tabs + center FAB (green checkmark = near spot, purple plus = story)
+│   │   ├── MapView.jsx              # Leaflet map — rotation gesture (150% container trick), compass button, user dot
+│   │   ├── SpotCard.jsx             # Spot list card — emoji/gradient placeholder (NO external images), open/closed badge
+│   │   ├── BottomNav.jsx            # 4 tabs + center FAB (3 states: check-in / checked-in / story)
 │   │   ├── StoryRing.jsx            # Circular avatar with gold/grey story ring
 │   │   ├── ReportModal.jsx          # Bottom sheet report modal
 │   │   ├── Icons.jsx                # All SVG icons as React components
 │   │   ├── Loading.jsx              # Full-screen spinner
+│   │   ├── CrowdBadge.jsx           # Crowd level pill badge
 │   │   └── Avatar.jsx               # Initials avatar
 │   │
 │   ├── data/
 │   │   └── spots.js                 # SPOTS_SEED (8 spots), CATEGORIES, SPOT_TAGS, SPOT_TAG_LABELS, filterSpots()
 │   │
 │   └── test/
-│       ├── spots.test.js            # 10 tests — new categories/tags/seed schema
-│       ├── theme.test.js            # 7 tests — DARK/LIGHT token completeness
-│       ├── SpotCard.test.jsx        # 7 tests — renders name/neighborhood/distance/rating/badge
-│       ├── AuthScreen.test.jsx      # 10 tests — sign in/up flow + Apple button
-│       ├── SpotsContext.test.jsx    # 11 tests — checkIn toggle + SPOTS_SEED integrity + Firestore payload
-│       └── StoriesContext.test.jsx  # 4 tests — story expiry filtering logic
+│       ├── spots.test.js
+│       ├── theme.test.js
+│       ├── SpotCard.test.jsx
+│       ├── AuthScreen.test.jsx
+│       ├── SpotsContext.test.jsx
+│       └── StoriesContext.test.jsx
 │
 ├── functions/
 │   ├── src/index.ts                 # deleteUserData Cloud Function (v2 onCall)
-│   ├── package.json                 # firebase-admin ^12, firebase-functions ^5, Node 20
+│   ├── package.json
 │   └── tsconfig.json
 │
 ├── public/
-│   ├── privacy.html                 # Privacy policy (Egypt Law 151, Firestore TTL, GDPR)
-│   └── terms.html                   # Terms of service
+│   ├── privacy.html
+│   └── terms.html
 │
-├── capacitor.config.js              # CommonJS — appId: com.egyspots.app
-├── firestore.rules                  # Security rules — messages are subcollection under spots/{spotId}/messages
-├── storage.rules                    # Storage rules (deploy: firebase deploy --only storage)
-├── vite.config.js                   # HTTPS dev server (basicSsl plugin) — host: true, port 5173
-├── vitest.config.js                 # jsdom environment
-└── package.json                     # Scripts: dev, build, test, preview
+├── capacitor.config.json
+├── firestore.rules
+├── storage.rules
+├── vite.config.js
+├── vitest.config.js
+└── package.json
 ```
+
+**Deleted:** `src/screens/CheckInModal.jsx` — removed entirely, check-in is one-tap from FAB or SpotDetailScreen button.
 
 ---
 
@@ -143,24 +147,24 @@ State-driven routing. Overlay priority order (top = highest):
 3. `settingsOpen` → SettingsScreen
 4. `editProfileOpen` → EditProfileScreen
 5. `addSpotOpen` → AddSpotScreen
-6. `addStoryOpen` → AddStoryScreen
-7. `storyViewerSpotId` → StoryViewerScreen
-8. `checkInSpot` → CheckInModal (only used from SpotDetailScreen)
+6. `addStoryOpen` → AddStoryScreen (receives `defaultSpotId` prop)
+7. `editSpotOpen + editSpotTarget` → EditSpotScreen
+8. `storyViewerSpotId` → StoryViewerScreen
 9. `chatOpen + selectedSpot` → ChatScreen
 10. `searchOpen` → SearchScreen
 11. `selectedSpot` → SpotDetailScreen
 12. Tabs: `'map'` | `'explore'` | `'stories'` | `'profile'`
 
-**Proximity-based FAB (one-tap check-in):**
-- `watchPosition` continuously tracks user GPS → `userPos` state
-- `haversineMeters` computes distance to all spots every time `userPos` or `spots` changes
-- If nearest spot ≤ 200m → `nearbySpot` state is set
-- `handleFAB`: if `nearbySpot` → calls `checkIn(nearbySpot.id)` directly (no modal); else → opens AddStoryScreen
-- `checkIn` toggles: if already checked in to the same spot, it checks out instead
-- **Auto-checkout**: a `useEffect` watching `nearbySpot` + `userPos` calls `checkIn(checkedInId)` when the user walks away from their checked-in spot
-- `nearbySpot` passed to both BottomNav instances — FAB turns green with checkmark + "Check In" label
+**Proximity-based FAB:**
+- `watchPosition` (enableHighAccuracy: true) continuously tracks GPS → `userPos`
+- `haversineMeters` finds nearest spot; if ≤ 200m → `nearbySpot`
+- `handleFAB` (async): if `nearbySpot` → `await checkIn(nearbySpot.id)` → shows cooldown toast or "Checked in" toast; else → opens AddStoryScreen
+- **Auto-checkout**: `useEffect` watching `nearbySpot + userPos` calls `checkIn(checkedInId)` when user walks away
+- **Cooldown toast**: if `checkIn` returns `{ error: 'cooldown', minutesLeft }`, FAB shows `"Wait X min — checked in recently"`
 
-**`checkIn` and `checkedInId`** are destructured from `useSpots()` in App.jsx — do not remove them.
+**`addStoryDefaultId`** — set to `selectedSpot.id` when user taps "+" in SpotDetailScreen, so AddStoryScreen pre-selects the right spot.
+
+**`onStoryViewer`** — ProfileScreen receives `(spotId) => setStoryViewerSpotId(spotId)` so story cards in the Stories tab open the correct spot's viewer.
 
 ---
 
@@ -169,70 +173,139 @@ State-driven routing. Overlay priority order (top = highest):
 ```
 [ Map ] [ Explore ] [ FAB ] [ Stories ] [ Profile ]
 ```
-- FAB = center raised button. **Green + checkmark = near a spot (one-tap check-in/out). Purple + plus = not near (post story).**
-- Stories tab has unviewedCount badge (red dot)
-- Profile tab has unreadCount badge from NotificationsContext
+- FAB = center raised button — **3 states**:
+  - **Green checkmark "Check In"** — near a spot, not yet checked in
+  - **Purple checkmark "Here ✓"** — near a spot AND already checked in there
+  - **Purple plus "Story"** — not near any spot
+- Toast banner slides up above BottomNav for 2.5s after FAB check-in
 
 ---
 
 ## Bottom Sheet (ExploreScreen)
 
-The spot list bottom sheet is **fully draggable via touch**:
-- `handleRef` registered with a non-passive `touchmove` listener (prevents page scroll during drag)
-- `onTouchStart` on the handle records start Y + timestamp
-- `onTouchEnd` snaps to open (88% height) or closed (210px peek) based on direction + velocity
-- Short tap (< 8px movement) toggles open/close
-- `onClick` on the handle also toggles (for desktop/mouse)
-- Sheet height is React state (`sheetOpen ? '88%' : 210`) with CSS transition — no direct DOM manipulation
-- List `overflowY: 'auto'` always; sheet height clips the content
+Fully draggable via touch — `handleRef` + non-passive `touchmove` listener. Snaps to open (88%) or closed (210px peek) based on direction + velocity. Short tap toggles.
 
 ---
 
 ## Stories Feature
 
-- Stored in Firestore `stories` collection with `expiresAt` field (6 hours from creation)
-- Firestore TTL policy on `expiresAt` auto-deletes expired docs (must be configured in Console)
-- StoriesContext: `MOCK_STORIES_LIVE` (4 demo stories) is the **initial React state** so Stories tab is never empty
-- `onSnapshot` falls back to `MOCK_STORIES_LIVE` if Firestore returns 0 docs
-- Story ring appears on map markers when `storiesBySpot[spot.id]?.length > 0`
-- Posting a story requires being within 300m of the selected spot (`STORY_RADIUS_M`)
+- Stored in Firestore `stories` collection; `expiresAt` field = 6 hours from creation
+- Firestore TTL policy on `expiresAt` auto-deletes expired docs (configure in Console)
+- `storiesBySpot` map in StoriesContext: keyed by `spotId`
+- Posting a story requires being within 300m (`STORY_RADIUS_M`)
+- After posting, notifies spot founder via `notifications` collection (type: `new_story`)
+- ChatScreen shows real stories bar from `storiesBySpot[spot.id]`
 
 ---
 
-## Spot Photos
+## Spot Photos — IMPORTANT
 
-`SpotCard` uses `spot.coverPhotoURL` if set, otherwise falls back to:
+**No external image URLs.** SpotCard uses `spot.coverPhotoURL` if set; otherwise shows a gradient + emoji placeholder:
 ```js
-`https://picsum.photos/seed/${spot.id}/200/150`
+const CATEGORY_EMOJI = { hangout: '☕', car_meet: '🚗', street_cart: '🍔', pop_up: '🎪', open_air: '🌿' };
 ```
-This gives each spot a consistent placeholder image based on its ID. Real photos are stored in Firebase Storage and saved to `spots/{id}.coverPhotoURL` in Firestore.
+**Do NOT restore picsum.photos** — it crashes WKWebView on iOS (cross-origin network request to external domain).
 
-Spot color: uses `spot.color` if set; otherwise derived from category via `CATEGORY_COLORS` map in SpotCard:
+SpotDetailScreen has a **photo gallery strip** (`spot.photoURLs[]`) with tap-to-fullscreen lightbox. Founders can upload additional photos (uploaded to `spots/{id}/photos/{timestamp}.jpg` in Storage, appended via `arrayUnion` to `spot.photoURLs` in Firestore).
+
+---
+
+## Open/Closed Indicator
+
+`src/utils/openStatus.js` exports:
 ```js
-{ hangout: '#A78BFA', car_meet: '#F59E0B', street_cart: '#10B981', pop_up: '#EC4899', open_air: '#3B82F6' }
+getOpenStatus(operatingHours)
+// Returns { isOpen: bool, label: string } or null if no hours data
+// label examples: 'Open Now', 'Closes 10PM', 'Opens 9AM', 'Closed today'
 ```
+Used in SpotCard (small colored label below neighborhood) and SpotDetailScreen hero (pill badge next to spot name).
+
+---
+
+## Rating System
+
+Users can submit 1–5 star ratings from SpotDetailScreen. Stored in `spots/{spotId}/ratings/{userId}` subcollection.
+
+On submit, a **Firestore transaction** atomically:
+1. Reads the user's existing rating doc
+2. Reads the spot's `ratingSum` + `ratingCount`
+3. Adjusts sum (replacing old rating if exists, incrementing count if new)
+4. Writes new `spot.rating = ratingSum / ratingCount` (1 decimal place)
+
+User's existing rating is loaded on mount. Changing rating correctly updates the running average.
+
+---
+
+## Check-in Spam Guard
+
+`SpotsContext.checkIn()` — before any optimistic update:
+- `CHECKIN_COOLDOWN_MINUTES = 5`
+- If user checked in to the same spot within 5 minutes → returns `{ error: 'cooldown', minutesLeft }`
+- Cooldown applies only to NEW check-ins (`!isLeaving`) — auto-checkout (leaving) is never blocked
+- App.jsx FAB handler shows toast: `"Wait X min — checked in recently"`
+
+---
+
+## Firestore Seed Migration
+
+`SpotsContext` runs `syncSeeds()` on every app start:
+- If `spots` collection is **empty** → batch-creates all SPOTS_SEED docs
+- If spots **exist** → back-fills missing `description` / `operatingHours` on seed docs only (idempotent, uses writeBatch)
+
+---
+
+## Map Rotation (MapView)
+
+Two-finger twist gesture rotates the map. Implementation:
+- **Container size**: `position: absolute; width: 150%; height: 150%; top: -25%; left: -25%` — oversized so corners never reveal background at any rotation angle
+- **Snap-back removed**: bearing is preserved when fingers lift (`onEnd` only clears the gesture ref, does not reset rotation)
+- **Compass button**: sits in a `pointer-events: none` overlay div; button itself has `pointer-events: auto` — prevents Leaflet's rotated layers from intercepting taps
+- **Reset north**: compass button resets bearing to 0 with CSS transition
+
+---
+
+## Firebase Auth — Capacitor / WKWebView Notes
+
+**`src/firebase.js`** — uses `initializeAuth` with `inMemoryPersistence`:
+```js
+export const auth = initializeAuth(app, { persistence: inMemoryPersistence });
+```
+**Do NOT switch to `getAuth()`** — it starts IndexedDB immediately, which silently hangs WKWebView on iOS.
+Tradeoff: users must re-login each app open (no session persistence).
+
+**`src/context/AuthContext.jsx`** — 3-second fallback timeout on `onAuthStateChanged`.
+
+**`src/context/SpotsContext.jsx`** — `loading` starts as `false`; `SPOTS_SEED` pre-populates immediately.
 
 ---
 
 ## Firestore Collections (current schema)
 
-**`spots/{spotId}`** — seeded from SPOTS_SEED on first load
+**`spots/{spotId}`**
 ```js
 { id, name, nameAr, category, tags, neighborhood, address, city,
   founderId, founderName, isMobile, crowd, crowdPct,
   checkins, checkinsToday, weeklyCheckins, totalCheckins,
-  rating, operatingHours, lat, lng, status, createdAt }
+  rating, ratingSum, ratingCount,          // ratingSum/ratingCount added by rating system
+  operatingHours,                           // { monday: {open, close, closed}, ... }
+  coverPhotoURL, photoURLs: [],             // photoURLs = additional gallery photos
+  lat, lng, status, createdAt }
 ```
 
-**`spots/{spotId}/messages/{messageId}`** — subcollection (NOT a top-level collection)
+**`spots/{spotId}/messages/{messageId}`**
 ```js
 { text, userId, userName, userAvatar, createdAt }
+```
+
+**`spots/{spotId}/ratings/{userId}`**
+```js
+{ rating, userId, timestamp }
 ```
 
 **`users/{uid}`**
 ```js
 { uid, email, displayName, username, profilePhotoURL, bio, city,
-  role: 'user', totalCheckins, activeCheckin,
+  role: 'user', totalCheckins, activeCheckin, savedSpots: [],
   notifSettings: { newSpots, checkIns, stories, systemAlerts },
   createdAt }
 ```
@@ -256,65 +329,50 @@ Spot color: uses `spot.color` if set; otherwise derived from category via `CATEG
 
 **`notifications/{notifId}`**
 ```js
-{ toUserId, type, title, body, data, read: false, createdAt }
+{ toUserId, type, title, body, data: { spotId }, isRead: false, createdAt }
+// types: 'checkin_at_your_spot' | 'new_story'
 ```
+
+---
+
+## EditSpotScreen (founders only)
+
+Editable fields: name, nameAr, description, category, address, tags, cover photo, operating hours (Mon–Sun open/close toggles with time inputs).
+
+**Delete spot**: "Delete This Spot" button → confirmation card → `deleteDoc(doc(db, 'spots', spot.id))` → `onBack()`.
+
+Saved to Firestore via `updateDoc` including `operatingHours` object.
 
 ---
 
 ## Auth — Sign in with Apple
 
-Required by App Store when any third-party OAuth is present. Uses `OAuthProvider('apple.com')` with dynamic import to avoid static import issues.
-
-Apple must be enabled in: Firebase Console → Auth → Sign-in providers → Apple.
-Also requires Apple Developer Program account ($99/year) with Services ID configured.
+Required by App Store. Uses `OAuthProvider('apple.com')` with dynamic import. Must be enabled in Firebase Console → Auth → Sign-in providers. Requires Apple Developer Program ($99/year) with Services ID configured.
 
 ---
 
-## Test Suite — Critical Notes
+## Safe-Area Pattern
 
-Run: `npm test` — should output **49/49 passing**.
-
-**AuthScreen submit button selector** (used in 4 tests — do NOT change):
-```js
-screen.getAllByRole('button').find(
-  (btn) => btn.textContent === 'Sign In' && btn.style.borderRadius === '16px'
-)
+All screens use spacer div (not padding) for iOS notch:
+```jsx
+<div style={{ height: 'env(safe-area-inset-top, 44px)' }} />   // in header
+<div style={{ height: 'env(safe-area-inset-top, 0px)' }} />    // in non-header contexts
 ```
-The tab toggle buttons also say "Sign In"/"Sign Up" but have `borderRadius: 12px`. Never change submit button's `borderRadius` without updating tests.
+**Never** use `calc()` in padding for safe area — it doesn't work reliably in WKWebView.
 
 ---
 
-## Geo / Proximity
+## Dev Server — GPS on Mobile
 
-File: `src/utils/geo.js`
-```js
-haversineMeters(a, b)   // { lat, lng } objects → distance in meters
-CHECKIN_RADIUS_M = 200  // must be within 200m to trigger check-in FAB
-STORY_RADIUS_M   = 300  // must be within 300m to post a story
-```
-
----
-
-## Dev Server — HTTPS Required for GPS on Mobile
-
-GPS (`navigator.geolocation`) is **blocked by Chrome on Android over plain HTTP** (except localhost).
-The dev server now runs HTTPS via `@vitejs/plugin-basic-ssl`.
+GPS is blocked by Chrome over plain HTTP (except localhost). Current setup is plain HTTP (basicSsl reverted).
 
 ```bash
-npm run dev   # starts https://0.0.0.0:5173
+npm run dev   # starts http://0.0.0.0:5173
 ```
 
-On another device (same Wi-Fi):
-1. Find your laptop IP: run `ipconfig`, look for Wi-Fi IPv4 address (e.g. `192.168.1.42`)
-2. Open `https://192.168.1.42:5173` on the phone
-3. Accept the browser's "not secure" warning for the self-signed cert
-4. GPS will now work
+To test GPS from a phone on same Wi-Fi: re-add `@vitejs/plugin-basic-ssl` to `vite.config.js`.
 
-Windows Firewall must allow port 5173 inbound:
-```powershell
-# Run as Administrator
-New-NetFirewallRule -DisplayName "Vite Dev Server" -Direction Inbound -Protocol TCP -LocalPort 5173 -Action Allow
-```
+Mac IP: `ipconfig getifaddr en0` (Wi-Fi) or `en1`.
 
 ---
 
@@ -324,49 +382,148 @@ New-NetFirewallRule -DisplayName "Vite Dev Server" -Direction Inbound -Protocol 
 2. **Deploy Firestore rules**: `firebase deploy --only firestore:rules`
 3. **Deploy Storage rules**: `firebase deploy --only storage`
 4. **Deploy Cloud Functions**: `cd functions && npm install && cd .. && firebase deploy --only functions`
-5. **Set Firestore TTL** on `stories.expiresAt` — Firebase Console → Firestore → TTL policies → Add policy → Collection: `stories`, field: `expiresAt`
-6. **Deploy hosting** (privacy + terms pages): `firebase deploy --only hosting`
+5. **Set Firestore TTL** on `stories.expiresAt` — Firebase Console → Firestore → TTL policies → Collection: `stories`, field: `expiresAt`
+6. **Deploy hosting**: `firebase deploy --only hosting`
 7. **Add iOS/Android**: `npx cap add ios && npx cap add android && npx cap sync`
+
+**Xcode**: always **Cmd+Shift+K** (clean build) after `npm run build && npx cap sync ios`.
+
+---
+
+## What's NOT Done (requires infrastructure)
+
+1. **Daily/weekly counter reset** — `checkinsToday` / `weeklyCheckins` only ever increment. Needs a scheduled Firebase Cloud Function (cron) to zero them at midnight/week boundary.
+2. **Push notifications** — needs `@capacitor-firebase/messaging` native plugin + APNs cert + Cloud Function to fan-out messages. Cannot be done in web code alone.
+
+---
+
+## Test Suite
+
+Run: `npm test` — should output **49/49 passing**.
+
+**AuthScreen submit button selector** (used in 4 tests — do NOT change):
+```js
+screen.getAllByRole('button').find(
+  (btn) => btn.textContent === 'Sign In' && btn.style.borderRadius === '16px'
+)
+```
+
+---
+
+## Geo / Proximity
+
+`src/utils/geo.js`:
+```js
+haversineMeters(a, b)       // { lat, lng } objects → meters
+CHECKIN_RADIUS_M   = 200    // within 200m to check in
+STORY_RADIUS_M     = 300    // within 300m to post a story
+MIN_SPOT_DISTANCE_M = 300   // new spots must be ≥300m from any existing spot
+```
 
 ---
 
 ## Change Log
 
+### 2026-04-30 (sessions 6–7) — Feature completion: all frontend items done
+
+**New utility:**
+- `src/utils/openStatus.js` — `getOpenStatus(operatingHours)` computes open/closed status from current day+time. Returns `{ isOpen, label }` or `null`. `DEFAULT_HOURS()` generates a full Mon–Sun open schedule.
+
+**SpotDetailScreen — major additions:**
+- **Open/closed badge** in hero next to spot name (green "Open Now" / red "Opens 9AM" / "Closed today")
+- **Photo gallery strip** — horizontal scroll of `spot.photoURLs[]`; each photo tappable for fullscreen lightbox. Founders see "+ Add Photo" tile that uploads to Storage and appends via `arrayUnion`.
+- **Photo lightbox** — `position: fixed` fullscreen dark overlay; tap outside or ✕ to dismiss.
+- **Star rating UI** — 5 tappable stars below Operating Hours; stars highlight on hover; rating saved to `spots/{id}/ratings/{uid}` subcollection via Firestore transaction; running average written back to `spot.rating` / `spot.ratingSum` / `spot.ratingCount` atomically. User's previous rating loaded on mount; changing it correctly adjusts the average.
+- Added `useRef` for photo file input; imported `arrayUnion`, `runTransaction`, `setDoc`, `getDoc`, `serverTimestamp` from Firestore; imported storage/Storage utils.
+
+**SpotCard:**
+- Removed all `picsum.photos` dependencies (caused WKWebView crashes on iOS)
+- Added `CATEGORY_EMOJI` map; cover area shows gradient + emoji when no `coverPhotoURL`
+- Added `getOpenStatus` — shows green/red open status label below neighborhood
+
+**EditSpotScreen (new file):**
+- Full editing: name, nameAr, description, category, address, tags, cover photo upload
+- **Operating hours editor** — Mon–Sun rows with Open/Closed toggle + `<input type="time">` for open/close times; saved to `operatingHours` in Firestore
+- **Delete spot** — "Delete This Spot" button → confirmation UI → `deleteDoc` → `onBack()`
+- Blob URL cleanup via `useRef` + `useEffect`
+
+**SpotsContext:**
+- `syncSeeds()` replaces `seedIfEmpty` — back-fills `description`/`operatingHours` on existing seed docs (idempotent writeBatch)
+- `CHECKIN_COOLDOWN_MINUTES = 5` (was 30)
+- Spam guard runs **before** optimistic state update; returns `{ error: 'cooldown', minutesLeft }`
+- After new check-in: notifies spot founder via `notifications` collection (fire-and-forget)
+
+**App.jsx:**
+- `handleFAB` is now `async`; awaits `checkIn()` result; shows cooldown toast
+- Added `editSpotOpen` / `editSpotTarget` state + EditSpotScreen overlay
+- Added `addStoryDefaultId` state; passed to AddStoryScreen as `defaultSpotId`
+- ProfileScreen receives `onStoryViewer={(spotId) => setStoryViewerSpotId(spotId)}`
+- SpotDetailScreen receives `onAddStory`, `onEditSpot` (only when `user.uid === spot.founderId`)
+- GPS: `enableHighAccuracy: true, maximumAge: 10000, timeout: 15000`
+
+**ProfileScreen:**
+- Check-in history cards show timestamp: "28 Apr · 11:42 PM"
+- Stories tab cards are now tappable — calls `onStoryViewer(s.spotId)` to open StoryViewerScreen
+
+**AddStoryScreen:**
+- After posting: notifies spot founder via `notifications` collection (type: `new_story`, fire-and-forget)
+
+**ChatScreen:**
+- Removed mock stories import; now uses real `storiesBySpot[spot.id]` from StoriesContext
+- Stories bar shows real seen/unseen ring state
+- Empty state: "No messages yet — be the first to say something!"
+
+**StoriesContext:**
+- `MOCK_STORIES_LIVE` and `seedDemoStories`: `photoURL: null` (removed picsum.photos URLs)
+
+**MapView:**
+- Map container: `position: absolute; width: 150%; height: 150%; top: -25%; left: -25%` — prevents corner clipping at any rotation angle
+- Compass button: wrapped in `pointer-events: none` overlay div; button itself has `pointer-events: auto`
+- Snap-back removed: bearing preserved when fingers lift
+
+**Safe-area fixes applied to:** StoryViewerScreen, NotificationsScreen, EditProfileScreen, DiscoverScreen, ProfileScreen, AddSpotScreen, EditSpotScreen, ChatScreen.
+
+**DiscoverScreen:**
+- Trending section: sorted by composite score (`weeklyCheckins + crowdPct*2 + rating*10`)
+- "Featured Vendors" section hidden when `featured.length === 0`
+
+**CheckInModal.jsx — DELETED.** One-tap check-in is handled entirely by FAB (App.jsx) and SpotDetailScreen button.
+
+---
+
+### 2026-04-29 (session 5b) — Map rotation, location, all remaining priority fixes
+
+- **Map starts at user location instantly** — `hasSetInitialRef`: first call uses `map.setView()` (no animation)
+- **Map rotation** — two-finger twist gesture; compass needle when rotated; tap to reset north
+- **Error boundary** — `ErrorBoundary` in `main.jsx`; uncaught crashes show "Reload App" button
+- **Heart / save spot** — `toggleSaveSpot(spotId)` in AuthContext; heart turns red when saved
+- **Check-in history refresh** — `checkIn()` prepends new check-in to `checkinHistory` immediately
+- **Email verification UI** — "Check your email" message after sign-up
+- **Blob URL leak fixed** — AddStoryScreen revokes URLs on cleanup + before new pick
+
+### 2026-04-29 (session 5) — Check-in proximity, real distances, search filters, theme persistence
+
+- **FAB 3-state**: green check-in / purple checked-in / purple story
+- **SpotDetailScreen**: real distance from GPS; proximity-enforced check-in button
+- **ExploreScreen**: spot list sorted by distance; live distance strings
+- **SearchScreen**: rewritten with proper safe-area; nearby/popular filters use real GPS
+- **ThemeContext**: dark/light persisted to `localStorage`
+- **AddSpotScreen**: 300m min-distance enforcement
+
+### 2026-04-27 (session 4) — Mac migration + iOS loading screen fix
+
+- `initializeAuth` + `inMemoryPersistence` to fix WKWebView hang
+- 3-second `onAuthStateChanged` fallback timeout
+- `SpotsContext loading` starts as `false`
+
 ### 2026-04-25 (session 3) — Bug fixes + UX polish
 
-**Fixed:**
-- **Stories tab crash**: `handleStoryFAB` (undefined) replaced with inline arrow function in `case 'stories'`
-- **Bottom sheet**: Replaced DOM-manipulation approach with clean React-state + CSS transition implementation. `handleRef` for non-passive touchmove, snap-on-release with velocity detection, `onClick` for desktop
-- **Spot photos**: SpotCard now shows Picsum placeholder (`picsum.photos/seed/{id}/200/150`) when `coverPhotoURL` is empty; category-based color fallback when `spot.color` is unset
-- **One-tap check-in**: FAB now calls `checkIn(nearbySpot.id)` directly — no modal steps
-- **Auto-checkout**: `useEffect` in App.jsx watches `nearbySpot + userPos` and auto-calls `checkIn(checkedInId)` when user walks away from their checked-in spot
-- **GPS on mobile**: Added `@vitejs/plugin-basic-ssl` — dev server now runs HTTPS so Chrome on Android grants geolocation permission
-- **Chat path**: Messages moved to `spots/{spotId}/messages` subcollection (was flat `messages` collection)
-- **Firestore rules**: Messages rule nested inside `match /spots/{spotId}` as proper subcollection
-- **Profile photo upload**: EditProfileScreen uploads `blob:` URLs to Firebase Storage `users/{uid}/profile.jpg`
-- **StoriesContext**: `MOCK_STORIES_LIVE` as initial state; fallback when Firestore returns empty
+- Bottom sheet rewritten with React state + CSS transitions
+- One-tap check-in FAB (no modal)
+- Auto-checkout when user walks away
+- Chat moved to `spots/{spotId}/messages` subcollection
+- Profile photo upload to Firebase Storage
 
-### 2026-04-25 (session 2) — Maat launch prep
+### 2026-04-25 (sessions 1–2) — Full pivot: vendor/café → youth hangout + stories
 
-- ExploreScreen draggable bottom sheet (DOM manipulation approach — later replaced in session 3)
-- AddSpotScreen GPS locking + status banner + user coordinates for new spots
-- App.jsx: userPos passed to AddSpotScreen; continuous GPS watchPosition
-- CheckInModal GPS error message: "Habibi, we need your GPS..."
-
-### 2026-04-25 (session 1) — Full App Pivot: Vendor/café → Youth Hangout + Stories
-
-**Removed:** All vendor/subscription/Paymob code. VendorsScreen, VendorProfileScreen, VendorDashboardScreen deleted.
-
-**Added:**
-- New categories: Street Cart / Car Meet / Hangout / Pop-Up / Open Air
-- Stories feature: StoriesContext, StoriesTab, StoryViewerScreen, AddStoryScreen, StoryRing, ReportModal
-- Sign in with Apple (App Store compliance)
-- Cloud Function for account deletion (`functions/src/index.ts`)
-- Firestore + Storage security rules rewritten
-- `public/privacy.html` + `public/terms.html` (Egypt Law 151)
-- Proximity-based FAB: GPS watchPosition → FAB turns green "Check In" when ≤200m from a spot
-- "Add Spot" button on map screen (ExploreScreen)
-- Dark map background during tile loading (`backgroundColor: t.bg` on Leaflet container)
-- `src/utils/geo.js` — shared haversine + radius constants
-- Story posting blocked if user is >300m from selected spot
-- 49/49 tests passing
+- New categories, Stories feature, Sign in with Apple, Cloud Functions, Firestore/Storage rules, proximity FAB, AddSpotScreen, 49/49 tests

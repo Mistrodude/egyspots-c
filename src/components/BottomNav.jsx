@@ -10,11 +10,12 @@ const TABS = [
   { id: 'profile', Icon: ProfileIcon, label: 'Profile' },
 ];
 
-export default function BottomNav({ tab, setTab, onStoryFABPress, nearbySpot }) {
+export default function BottomNav({ tab, setTab, onStoryFABPress, nearbySpot, checkedInId }) {
   const { t } = useTheme();
   const { unreadCount } = useNotifications();
   const { unviewedCount } = useStories();
   const isNearSpot = !!nearbySpot;
+  const isCheckedInHere = isNearSpot && checkedInId === nearbySpot?.id;
 
   return (
     <div style={{
@@ -24,29 +25,33 @@ export default function BottomNav({ tab, setTab, onStoryFABPress, nearbySpot }) 
       backdropFilter: 'blur(20px)',
       WebkitBackdropFilter: 'blur(20px)',
       borderTop: `1px solid ${t.border}`,
-      paddingBottom: 6,
+      paddingBottom: 'max(6px, env(safe-area-inset-bottom, 6px))',
       paddingTop: 6,
       flexShrink: 0,
       position: 'relative',
+      zIndex: 100,
     }}>
       {/* Map + Explore tabs */}
       {TABS.slice(0, 2).map(({ id, Icon, label }) => (
         <TabButton key={id} id={id} Icon={Icon} label={label} active={tab === id} setTab={setTab} t={t} />
       ))}
 
-      {/* Center FAB — Check In when near a spot, Story otherwise */}
+      {/* Center FAB — Here (purple) when checked in, Check In (green) when near, Story (purple) otherwise */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', paddingBottom: 2 }}>
         <button
           onClick={onStoryFABPress}
-          aria-label={isNearSpot ? `Check in to ${nearbySpot.name}` : 'Post a story'}
+          aria-label={isCheckedInHere ? `Leave ${nearbySpot.name}` : isNearSpot ? `Check in to ${nearbySpot.name}` : 'Post a story'}
           style={{
             width: 44, height: 44, borderRadius: '50%',
-            background: isNearSpot
+            background: isNearSpot && !isCheckedInHere
               ? 'linear-gradient(135deg, #22c55e, #16a34a)'
               : `linear-gradient(135deg, ${t.accent}, ${t.accent}cc)`,
-            border: 'none', cursor: 'pointer',
+            border: isCheckedInHere ? `2px solid ${t.accent}` : 'none',
+            cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: isNearSpot ? '0 4px 20px rgba(34,197,94,0.5)' : `0 4px 20px ${t.accent}66`,
+            boxShadow: isNearSpot && !isCheckedInHere
+              ? '0 4px 20px rgba(34,197,94,0.5)'
+              : `0 4px 20px ${t.accent}66`,
             marginTop: -10,
             transition: 'transform 0.15s, box-shadow 0.15s, background 0.3s',
           }}
@@ -55,7 +60,11 @@ export default function BottomNav({ tab, setTab, onStoryFABPress, nearbySpot }) 
           onTouchStart={(e) => { e.currentTarget.style.transform = 'scale(0.93)'; }}
           onTouchEnd={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
         >
-          {isNearSpot ? (
+          {isCheckedInHere ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M20 6L9 17l-5-5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : isNearSpot ? (
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path d="M20 6L9 17l-5-5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -63,8 +72,11 @@ export default function BottomNav({ tab, setTab, onStoryFABPress, nearbySpot }) 
             <PlusIcon color="white" size={18} />
           )}
         </button>
-        <span style={{ fontSize: 9, fontWeight: 600, color: isNearSpot ? '#22c55e' : t.muted, letterSpacing: '0.3px', marginTop: 2 }}>
-          {isNearSpot ? 'Check In' : 'Story'}
+        <span style={{
+          fontSize: 9, fontWeight: 600, letterSpacing: '0.3px', marginTop: 2,
+          color: isCheckedInHere ? t.accent : isNearSpot ? '#22c55e' : t.muted,
+        }}>
+          {isCheckedInHere ? 'Here ✓' : isNearSpot ? 'Check In' : 'Story'}
         </span>
       </div>
 

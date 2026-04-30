@@ -9,14 +9,14 @@ import { SPOTS_SEED } from '../data/spots';
 
 const StoriesContext = createContext(null);
 
-// Immediate in-memory stories so the Stories tab is never empty on first load
+// Immediate in-memory placeholder stories (no external image URLs)
 const MOCK_STORIES_LIVE = SPOTS_SEED.slice(0, 4).map((spot, i) => ({
   id:           `mock_${spot.id}`,
   spotId:       spot.id,
   userId:       'demo_user',
   userName:     'EgySpots Demo',
   userPhotoURL: null,
-  photoURL:     `https://picsum.photos/seed/${spot.id}/400/700`,
+  photoURL:     null,
   caption:      `Live at ${spot.name}! 🔥`,
   createdAt:    { toDate: () => new Date() },
   expiresAt:    { toDate: () => new Date(Date.now() + 6 * 3600 * 1000) },
@@ -36,7 +36,7 @@ async function seedDemoStories(uid) {
         userId:       uid,
         userName:     'EgySpots Demo',
         userPhotoURL: null,
-        photoURL:     `https://picsum.photos/seed/${spot.id}/400/700`,
+        photoURL:     null,
         caption:      `Live at ${spot.name}! 🔥`,
         createdAt:    now,
         expiresAt,
