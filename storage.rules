@@ -13,8 +13,8 @@ service firebase.storage {
                     && resource.metadata.uploadedBy == request.auth.uid;
     }
 
-    // Spot cover photos
-    match /spots/{spotId}/{fileName} {
+    // Spot photos — covers cover.jpg and photos/ subfolder
+    match /spots/{spotId}/{allPaths=**} {
       allow read: if true;
       allow create: if request.auth != null
                     && request.resource.size < 5 * 1024 * 1024

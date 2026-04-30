@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   collection, onSnapshot, doc, updateDoc, setDoc,
   addDoc, getDoc, getDocs, serverTimestamp, increment, query, where, orderBy, limit,
@@ -19,6 +19,12 @@ export function SpotsProvider({ children }) {
   const [checkedInId, setCheckedInId] = useState(null);
   const [loading,     setLoading]     = useState(false); // SPOTS_SEED pre-loaded; Firestore updates in background
   const [checkinHistory, setCheckinHistory] = useState([]);
+
+  // Refs so checkIn callback never goes stale without needing spots/checkinHistory in its deps
+  const spotsRef          = useRef(spots);
+  const checkinHistoryRef = useRef(checkinHistory);
+  useEffect(() => { spotsRef.current = spots; },          [spots]);
+  useEffect(() => { checkinHistoryRef.current = checkinHistory; }, [checkinHistory]);
 
   // Seed or migrate spot documents
   useEffect(() => {
@@ -99,11 +105,13 @@ export function SpotsProvider({ children }) {
   }, [user]);
 
   const checkIn = useCallback(async (spotId, options = {}) => {
+    const currentSpots   = spotsRef.current;
+    const currentHistory = checkinHistoryRef.current;
     const isLeaving = checkedInId === spotId;
 
     // Spam guard: same-spot re-checkin within cooldown window
     if (!isLeaving && user) {
-      const lastAtSpot = checkinHistory.find((c) => c.spotId === spotId);
+      const lastAtSpot = currentHistory.find((c) => c.spotId === spotId);
       if (lastAtSpot) {
         const ts = lastAtSpot.timestamp;
         const lastMs = ts instanceof Date ? ts.getTime() : ts?.toDate ? ts.toDate().getTime() : null;
@@ -130,7 +138,7 @@ export function SpotsProvider({ children }) {
       }
 
       if (!isLeaving) {
-        const spot = spots.find((s) => s.id === spotId);
+        const spot = currentSpots.find((s) => s.id === spotId);
 
         // Write checkin document
         const checkinData = {
@@ -187,7 +195,7 @@ export function SpotsProvider({ children }) {
       console.warn('Check-in error:', e.message);
       return { success: false, error: e.message };
     }
-  }, [checkedInId, user, userProfile, spots]);
+  }, [checkedInId, user, userProfile]);
 
   const submitReport = useCallback(async (targetType, targetId, reason, reasonNote = '') => {
     if (!user) return;

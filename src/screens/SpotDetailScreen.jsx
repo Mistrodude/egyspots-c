@@ -137,6 +137,7 @@ export default function SpotDetailScreen({ spot, userPos, onBack, onOpenChat, on
   const uploadPhoto = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
+    if (file.size > 5 * 1024 * 1024) { alert('Photo must be under 5 MB.'); return; }
     setUploadingPhoto(true);
     try {
       const sRef = ref(storage, `spots/${spot.id}/photos/${Date.now()}.jpg`);

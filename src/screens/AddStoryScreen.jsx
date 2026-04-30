@@ -32,6 +32,7 @@ export default function AddStoryScreen({ onClose, onRequireAuth, defaultSpotId, 
   const handleFileChange = (e) => {
     const f = e.target.files[0];
     if (!f) return;
+    if (f.size > 5 * 1024 * 1024) { setError('Photo must be under 5 MB.'); return; }
     if (preview) URL.revokeObjectURL(preview);
     setPhoto(f);
     setPreview(URL.createObjectURL(f));

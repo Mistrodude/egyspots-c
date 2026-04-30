@@ -9,18 +9,36 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
     }
 
-    // Spots: public read; any signed-in user can create their own or system seed spots;
-    //        limited update (crowd/checkin fields only); admin full write
     match /spots/{spotId} {
       allow read: if true;
+
       allow create: if isSignedIn()
         && (request.resource.data.founderId == request.auth.uid
             || request.resource.data.founderId == 'seed_founder');
-      allow update: if isAdmin()
-        || (isSignedIn() && onlyKeys(['checkins', 'totalCheckins', 'checkinsToday', 'weeklyCheckins', 'crowd', 'crowdPct']));
-      allow delete: if isAdmin();
 
-      // Messages subcollection: public read; auth users create own; owner delete
+      // Founder: full update of their spot.
+      // Any auth user: update check-in counters or rating fields only.
+      allow update: if isAdmin()
+        || (isSignedIn() && resource.data.founderId == request.auth.uid)
+        || (isSignedIn() && onlyKeys(['checkins', 'totalCheckins', 'checkinsToday', 'weeklyCheckins', 'crowd', 'crowdPct']))
+        || (isSignedIn() && onlyKeys(['ratingSum', 'ratingCount', 'rating']));
+
+      // Founder or admin can delete.
+      allow delete: if isAdmin()
+        || (isSignedIn() && resource.data.founderId == request.auth.uid);
+
+      // Ratings subcollection: any user can read; only owner can write their own rating.
+      match /ratings/{userId} {
+        allow read: if true;
+        allow create, update: if isSignedIn()
+          && request.auth.uid == userId
+          && request.resource.data.rating is number
+          && request.resource.data.rating >= 1
+          && request.resource.data.rating <= 5;
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      // Messages subcollection: public read; auth users create own; owner delete.
       match /messages/{messageId} {
         allow read: if true;
         allow create: if isSignedIn()
@@ -32,33 +50,20 @@ service cloud.firestore {
       }
     }
 
-    // Users: owner or admin only
+    // Users: owner or admin only.
     match /users/{uid} {
       allow read, write: if isOwner(uid) || isAdmin();
     }
 
-    // Reviews: public read; auth users create own; owner delete
-    match /reviews/{reviewId} {
-      allow read: if true;
-      allow create: if isSignedIn()
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.rating is int
-        && request.resource.data.rating >= 1
-        && request.resource.data.rating <= 5
-        && request.resource.data.text is string
-        && request.resource.data.text.size() <= 1000;
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
-    }
-
-    // Check-ins: public read; auth users create own; owner delete
+    // Check-ins: public read; auth users create own; owner delete.
     match /checkins/{checkinId} {
       allow read: if true;
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
-    // Stories: public read; auth users create own (6hr TTL enforced by Firestore TTL policy);
-    //          auth users can update viewCount/viewedBy only; owner or admin delete
+    // Stories: public read; auth users create own (TTL enforced by Firestore policy);
+    //          any auth user can update viewCount/viewedBy; owner or admin delete.
     match /stories/{storyId} {
       allow read: if true;
       allow create: if isSignedIn()
@@ -68,18 +73,20 @@ service cloud.firestore {
       allow update: if isSignedIn()
         && request.resource.data.diff(resource.data).affectedKeys()
            .hasOnly(['viewCount', 'viewedBy']);
-      allow delete: if isSignedIn() && (
-        resource.data.userId == request.auth.uid || isAdmin()
-      );
+      allow delete: if isSignedIn()
+        && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
-    // Notifications: receiver read/update; admin create/delete
+    // Notifications: receiver can read/update; any auth user can create (check-in + story events);
+    //                receiver or admin can delete.
     match /notifications/{notifId} {
       allow read, update: if isSignedIn() && resource.data.toUserId == request.auth.uid;
-      allow create, delete: if isAdmin();
+      allow create: if isSignedIn();
+      allow delete: if isAdmin()
+        || (isSignedIn() && resource.data.toUserId == request.auth.uid);
     }
 
-    // Reports: auth users create; admin read/update/delete
+    // Reports: auth users create own; admin read/update/delete.
     match /reports/{reportId} {
       allow create: if isSignedIn() && request.resource.data.reportedBy == request.auth.uid;
       allow read, update, delete: if isAdmin();
