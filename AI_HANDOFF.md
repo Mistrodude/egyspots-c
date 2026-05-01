@@ -1,6 +1,6 @@
 # AI Handoff — EgySpots (Read This First, Every Session)
 
-Last updated: 2026-04-30 (session 7)
+Last updated: 2026-05-01 (session 8)
 
 ---
 
@@ -27,7 +27,7 @@ Think "Snapchat Maps meets street culture." Core loop: open map → see what's l
 | Backend | Firebase (`egyspots-dc9c1`) | Firestore, Auth (email + Google + Apple), Storage. Spark (free) tier. |
 | Mobile | Capacitor v8 | Config: `capacitor.config.json`. |
 | State | React Context API | 5 contexts: `AuthContext`, `SpotsContext`, `ThemeContext`, `NotificationsContext`, `StoriesContext`. |
-| Tests | Vitest + @testing-library/react | 49/49 passing. Config: `vitest.config.js`. |
+| Tests | Vitest + @testing-library/react | Config: `vitest.config.js`. Run from terminal: `npm test`. Cannot run inside Claude Code's bash sandbox (IPC restriction). |
 | Font | Outfit (Google Fonts) | `fontFamily: 'Outfit, sans-serif'` everywhere. |
 | Cloud Functions | Firebase Functions v2 | `functions/src/index.ts` — `deleteUserData` onCall function. |
 
@@ -370,7 +370,7 @@ GPS is blocked by Chrome over plain HTTP (except localhost). Current setup is pl
 npm run dev   # starts http://0.0.0.0:5173
 ```
 
-To test GPS from a phone on same Wi-Fi: re-add `@vitejs/plugin-basic-ssl` to `vite.config.js`.
+To test GPS from a phone on same Wi-Fi: install `@vitejs/plugin-basic-ssl` (`npm i -D @vitejs/plugin-basic-ssl`) and add it back to `vite.config.js`. Note: `@vitejs/plugin-basic-ssl` was removed from `package.json` in session 8 (it conflicted with Vitest upgrade). Re-install it when needed for GPS testing, but don't keep it in devDependencies permanently.
 
 Mac IP: `ipconfig getifaddr en0` (Wi-Fi) or `en1`.
 
@@ -379,8 +379,8 @@ Mac IP: `ipconfig getifaddr en0` (Wi-Fi) or `en1`.
 ## Pending Deployment Steps (manual — not done yet)
 
 1. **Enable Apple Sign-in** in Firebase Console → Auth → Sign-in providers
-2. **Deploy Firestore rules**: `firebase deploy --only firestore:rules`
-3. **Deploy Storage rules**: `firebase deploy --only storage`
+2. ~~**Deploy Firestore rules**~~ ✅ Done 2026-05-01 — `firestore.rules` is live on `egyspots-dc9c1`
+3. **Deploy Storage rules** — first enable Firebase Storage: go to Firebase Console → Storage → Get Started, then run `firebase deploy --only storage`. The `storage.rules` file and `firebase.json` storage entry are already configured.
 4. **Deploy Cloud Functions**: `cd functions && npm install && cd .. && firebase deploy --only functions`
 5. **Set Firestore TTL** on `stories.expiresAt` — Firebase Console → Firestore → TTL policies → Collection: `stories`, field: `expiresAt`
 6. **Deploy hosting**: `firebase deploy --only hosting`
@@ -399,7 +399,13 @@ Mac IP: `ipconfig getifaddr en0` (Wi-Fi) or `en1`.
 
 ## Test Suite
 
-Run: `npm test` — should output **49/49 passing**.
+Run `npm test` **from your own terminal** (not through Claude Code — its bash sandbox blocks inter-process communication that Vitest requires for worker threads).
+
+**Test environment:** Node.js v24.4.1 + Vitest 4.1.5. Vitest 1.x was incompatible with Node v24 (worker IPC broken); upgraded in session 8.
+
+**Config:** `vitest.config.js` uses `vitest/config`, `@vitejs/plugin-react`, `environment: 'jsdom'`, `setupFiles: ['./src/test/setup.js']`.
+
+**Setup file:** `src/test/setup.js` imports `@testing-library/jest-dom/vitest` (NOT the bare `@testing-library/jest-dom` — the default entry assumes a global `expect` and hangs).
 
 **AuthScreen submit button selector** (used in 4 tests — do NOT change):
 ```js
@@ -423,6 +429,44 @@ MIN_SPOT_DISTANCE_M = 300   // new spots must be ≥300m from any existing spot
 ---
 
 ## Change Log
+
+### 2026-05-01 (session 8) — iOS crash fix, Firestore deploy, Vitest upgrade
+
+**iOS — camera permission crash fixed:**
+- Added `NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription`, `NSPhotoLibraryAddUsageDescription` to `ios/App/App/Info.plist`
+- Without these keys the app hard-crashed on iOS the moment any camera/gallery picker was triggered
+- After adding: iOS shows the standard system permission prompt instead of crashing
+- **Must rebuild in Xcode** (Cmd+R) after this change — Info.plist is native, not web
+
+**Firestore rules — deployed to production:**
+- `firebase deploy --only firestore:rules` succeeded — all the security rule fixes from session 7 are now live
+- The "Missing or insufficient permissions" warning in iOS logs should be gone
+
+**Storage rules — configured but not yet deployed:**
+- `firebase.json` now has a `"storage"` entry pointing to `storage.rules`
+- Cannot deploy until Firebase Storage is enabled: Firebase Console → Storage → Get Started
+- Then run: `firebase deploy --only storage`
+
+**Vitest upgraded 1.6.1 → 4.1.5:**
+- Node.js v24.4.1 (running on this machine) breaks Vitest 1.x worker thread IPC
+- Vitest 4.1.5 is compatible with Node v24
+- `@vitejs/plugin-basic-ssl` removed from `package.json` (was blocking the upgrade due to peer dep conflict requiring Vite 6+; it's no longer used since the HTTPS dev server was reverted)
+
+**Test setup fixed:**
+- `src/test/setup.js`: changed from `import '@testing-library/jest-dom'` → `import '@testing-library/jest-dom/vitest'`
+- The default entry assumed a global `expect` and hung when the test environment loaded
+
+**`vitest.config.js` — clean state:**
+- Uses `defineConfig` from `vitest/config` (not `vite`)
+- Includes `@vitejs/plugin-react` plugin (needed for JSX transform in tests)
+- `environment: 'jsdom'`, `setupFiles: ['./src/test/setup.js']`
+- No `globals: true` (test files explicitly import from 'vitest')
+
+**Note on running tests via Claude Code:**
+- Tests cannot be run through Claude Code's bash environment — the sandbox blocks IPC between Vitest's main process and worker threads
+- Run `npm test` directly in your Mac terminal; it will work there
+
+---
 
 ### 2026-04-30 (sessions 6–7) — Feature completion: all frontend items done
 
