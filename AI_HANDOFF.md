@@ -1,6 +1,6 @@
 # AI Handoff — EgySpots (Read This First, Every Session)
 
-Last updated: 2026-05-01 (session 8)
+Last updated: 2026-05-01 (session 9)
 
 ---
 
@@ -401,11 +401,17 @@ Mac IP: `ipconfig getifaddr en0` (Wi-Fi) or `en1`.
 
 Run `npm test` **from your own terminal** (not through Claude Code — its bash sandbox blocks inter-process communication that Vitest requires for worker threads).
 
-**Test environment:** Node.js v24.4.1 + Vitest 4.1.5. Vitest 1.x was incompatible with Node v24 (worker IPC broken); upgraded in session 8.
+**Result:** 49/49 tests pass across 6 files (as of 2026-05-01, session 9).
 
-**Config:** `vitest.config.js` uses `vitest/config`, `@vitejs/plugin-react`, `environment: 'jsdom'`, `setupFiles: ['./src/test/setup.js']`.
+**Test environment:** Node.js v24.4.1 + Vitest 3.2.4.
 
-**Setup file:** `src/test/setup.js` imports `@testing-library/jest-dom/vitest` (NOT the bare `@testing-library/jest-dom` — the default entry assumes a global `expect` and hangs).
+**Why Vitest 3, not 4:** `@vitejs/plugin-react` v4 uses `esbuildOptions` which conflicts with Vitest 4's `oxc` bundler — causes a deadlock during worker initialization. Vitest 3 uses esbuild throughout, so no conflict.
+
+**Why `pool: 'forks'`:** Node v24 has a `MessagePort` (worker_threads) IPC issue that causes `pool: 'threads'` workers to timeout waiting for RPC responses. `pool: 'forks'` uses `process.send()` instead and communicates cleanly.
+
+**Config:** `vitest.config.js` uses `vitest/config`, `@vitejs/plugin-react`, `environment: 'jsdom'`, `pool: 'forks'`, `setupFiles: ['./src/test/setup.js']`.
+
+**Setup file:** `src/test/setup.js` imports `@testing-library/jest-dom/vitest` (NOT bare `@testing-library/jest-dom` — hangs) and explicitly calls `cleanup()` in `afterEach` — without this, renders accumulate across tests and `getBy*` queries find multiple elements.
 
 **AuthScreen submit button selector** (used in 4 tests — do NOT change):
 ```js
@@ -430,6 +436,23 @@ MIN_SPOT_DISTANCE_M = 300   // new spots must be ≥300m from any existing spot
 
 ## Change Log
 
+### 2026-05-01 (session 9) — Tests fully green: 49/49
+
+**Problem root-cause chain:**
+- Vitest 1.x + Node v24 → workers fetched `/@vite/env` via HTTP with no server running → 230s timeout
+- Vitest 4.x → `@vitejs/plugin-react` v4's `esbuildOptions` conflict with Vitest 4's `oxc` bundler → deadlock during worker init → 60s startup timeout
+- Vitest 3.x + `pool:'threads'` → workers start fine but Node v24 `MessagePort` IPC hangs → another timeout
+- Vitest 3.x + `pool:'forks'` → uses `process.send()` IPC → works cleanly on Node v24
+
+**Fixes applied:**
+- `package.json` / `package-lock.json`: downgraded `vitest` 4.1.5 → 3.2.4 and `@vitest/coverage-v8` to match
+- `vitest.config.js`: changed `pool: 'threads'` → `pool: 'forks'`
+- `src/test/setup.js`: added `afterEach(cleanup)` from `@testing-library/react` — without it, each `render()` accumulated across tests within a file, causing `getBy*` to throw "found multiple elements"
+
+**Result:** 49/49 tests pass, all 6 test files green.
+
+---
+
 ### 2026-05-01 (session 8) — iOS crash fix, Firestore deploy, Vitest upgrade
 
 **iOS — camera permission crash fixed:**
@@ -447,20 +470,13 @@ MIN_SPOT_DISTANCE_M = 300   // new spots must be ≥300m from any existing spot
 - Cannot deploy until Firebase Storage is enabled: Firebase Console → Storage → Get Started
 - Then run: `firebase deploy --only storage`
 
-**Vitest upgraded 1.6.1 → 4.1.5:**
-- Node.js v24.4.1 (running on this machine) breaks Vitest 1.x worker thread IPC
-- Vitest 4.1.5 is compatible with Node v24
-- `@vitejs/plugin-basic-ssl` removed from `package.json` (was blocking the upgrade due to peer dep conflict requiring Vite 6+; it's no longer used since the HTTPS dev server was reverted)
+**Vitest upgraded 1.6.1 → 4.1.5 (later fixed in session 9 — see below):**
+- Node.js v24.4.1 breaks Vitest 1.x worker thread IPC (`/@vite/env` HTTP fetch timeout)
+- `@vitejs/plugin-basic-ssl` removed from `package.json` (peer dep conflict with Vite 5; it's no longer used since the HTTPS dev server was reverted)
 
 **Test setup fixed:**
 - `src/test/setup.js`: changed from `import '@testing-library/jest-dom'` → `import '@testing-library/jest-dom/vitest'`
 - The default entry assumed a global `expect` and hung when the test environment loaded
-
-**`vitest.config.js` — clean state:**
-- Uses `defineConfig` from `vitest/config` (not `vite`)
-- Includes `@vitejs/plugin-react` plugin (needed for JSX transform in tests)
-- `environment: 'jsdom'`, `setupFiles: ['./src/test/setup.js']`
-- No `globals: true` (test files explicitly import from 'vitest')
 
 **Note on running tests via Claude Code:**
 - Tests cannot be run through Claude Code's bash environment — the sandbox blocks IPC between Vitest's main process and worker threads
