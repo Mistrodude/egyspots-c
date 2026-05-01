@@ -317,9 +317,9 @@ export default function AuthScreen({ onBack }) {
                 </button>
                 <span style={{ fontSize: 12, color: t.muted, lineHeight: 1.5 }}>
                   I agree to the{' '}
-                  <span style={{ color: t.accent, cursor: 'pointer' }} onClick={() => window.open('https://egyspots-dc9c1.web.app/terms.html', '_blank', 'noopener')}>Terms of Service</span>
+                  <span style={{ color: t.accent, cursor: 'pointer' }} onClick={() => window.open('https://egyspots-dc9c1.web.app/terms.html', '_system')}>Terms of Service</span>
                   {' '}and{' '}
-                  <span style={{ color: t.accent, cursor: 'pointer' }} onClick={() => window.open('https://egyspots-dc9c1.web.app/privacy.html', '_blank', 'noopener')}>Privacy Policy</span>
+                  <span style={{ color: t.accent, cursor: 'pointer' }} onClick={() => window.open('https://egyspots-dc9c1.web.app/privacy.html', '_system')}>Privacy Policy</span>
                 </span>
               </div>
             </>

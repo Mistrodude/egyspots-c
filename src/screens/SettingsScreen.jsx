@@ -78,12 +78,12 @@ export default function SettingsScreen({ onBack, onRequireAuth }) {
           <button onClick={toggleTheme} style={toggle(t, isDark)}>Current: {isDark ? 'Dark' : 'Light'}</button>
         </Card>
         <Card t={t} title="Legal">
-          <button onClick={() => window.open('https://egyspots-dc9c1.web.app/terms.html', '_blank')} style={toggle(t, false)}>Terms of Service</button>
-          <button onClick={() => window.open('https://egyspots-dc9c1.web.app/privacy.html', '_blank')} style={toggle(t, false)}>Privacy Policy</button>
+          <button onClick={() => window.open('https://egyspots-dc9c1.web.app/terms.html', '_system')} style={toggle(t, false)}>Terms of Service</button>
+          <button onClick={() => window.open('https://egyspots-dc9c1.web.app/privacy.html', '_system')} style={toggle(t, false)}>Privacy Policy</button>
         </Card>
         <Card t={t} title="Support">
-          <button onClick={() => window.open('https://wa.me/201000000000', '_blank')} style={toggle(t, false)}>Contact via WhatsApp</button>
-          <button onClick={() => window.open('mailto:support@egyspots.com', '_blank')} style={toggle(t, false)}>Report a Bug</button>
+          <button onClick={() => window.open('https://wa.me/201000000000', '_system')} style={toggle(t, false)}>Contact via WhatsApp</button>
+          <button onClick={() => window.open('mailto:support@egyspots.com', '_system')} style={toggle(t, false)}>Report a Bug</button>
         </Card>
         <Card t={t} title="Danger Zone">
           <div style={{ fontSize: 11, color: t.muted }}>This permanently deletes your account, stories, and check-in history.</div>

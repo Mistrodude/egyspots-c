@@ -132,7 +132,7 @@ export default function SpotDetailScreen({ spot, userPos, onBack, onOpenChat, on
     } catch (_) {}
   };
 
-  const openMaps = () => window.open(`https://maps.google.com/?q=${spot.lat},${spot.lng}`, '_blank', 'noopener,noreferrer');
+  const openMaps = () => window.open(`maps://?ll=${spot.lat},${spot.lng}&q=${encodeURIComponent(spot.name || 'Spot')}`, '_system');
 
   const uploadPhoto = async (e) => {
     const file = e.target.files?.[0];

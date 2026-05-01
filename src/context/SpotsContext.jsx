@@ -26,8 +26,9 @@ export function SpotsProvider({ children }) {
   useEffect(() => { spotsRef.current = spots; },          [spots]);
   useEffect(() => { checkinHistoryRef.current = checkinHistory; }, [checkinHistory]);
 
-  // Seed or migrate spot documents
+  // Seed or migrate spot documents (requires auth — rules block unauthenticated writes)
   useEffect(() => {
+    if (!user) return;
     const syncSeeds = async () => {
       try {
         const snap = await getDocs(collection(db, 'spots'));
@@ -54,7 +55,7 @@ export function SpotsProvider({ children }) {
       }
     };
     syncSeeds();
-  }, []);
+  }, [user]);
 
   // Real-time spots listener
   useEffect(() => {
