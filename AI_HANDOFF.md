@@ -1,6 +1,6 @@
 # AI Handoff — EgySpots (Read This First, Every Session)
 
-Last updated: 2026-05-01 (session 9)
+Last updated: 2026-05-01 (session 10)
 
 ---
 
@@ -124,6 +124,7 @@ egyspots-c/
 │   └── tsconfig.json
 │
 ├── public/
+│   ├── index.html           # Marketing website (single-file, no build step)
 │   ├── privacy.html
 │   └── terms.html
 │
@@ -435,6 +436,16 @@ MIN_SPOT_DISTANCE_M = 300   // new spots must be ≥300m from any existing spot
 ---
 
 ## Change Log
+
+### 2026-05-01 (session 10) — Marketing website
+
+- **`public/index.html`** — single-file marketing website, no build step, no external frameworks
+- Sections: Nav, Hero (phone mockup), How it Works, What You'll Find (5 category cards), About, Download (App Store + Google Play badges), Footer
+- Stack: HTML + inline CSS + 6-line JS (IntersectionObserver fade-in). Font: Outfit via Google Fonts. Colors: `#0D0D0D` bg / `#F5C518` gold.
+- App Store / Google Play links are `#` placeholders — replace with real store URLs when app is published.
+- `public/privacy.html` and `public/terms.html` were pre-existing — not touched.
+
+---
 
 ### 2026-05-01 (session 9) — Tests fully green: 49/49
 
