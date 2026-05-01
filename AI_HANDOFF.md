@@ -249,9 +249,10 @@ User's existing rating is loaded on mount. Changing rating correctly updates the
 
 ## Firestore Seed Migration
 
-`SpotsContext` runs `syncSeeds()` on every app start:
+`SpotsContext` runs `syncSeeds()` after auth resolves (requires `user` — Firestore rules block unauthenticated writes):
 - If `spots` collection is **empty** → batch-creates all SPOTS_SEED docs
 - If spots **exist** → back-fills missing `description` / `operatingHours` on seed docs only (idempotent, uses writeBatch)
+- `useEffect` dependency is `[user]` — will not run until a user is signed in
 
 ---
 
@@ -437,13 +438,33 @@ MIN_SPOT_DISTANCE_M = 300   // new spots must be ≥300m from any existing spot
 
 ## Change Log
 
-### 2026-05-01 (session 10) — Marketing website
+### 2026-05-01 (session 10) — iOS log fixes: Firestore permissions + external URL sandbox
 
+**Firestore "Missing or insufficient permissions" warning fixed:**
+- `SpotsContext.syncSeeds()` was running on every mount without an auth guard
+- Firestore rules require `isSignedIn()` for all writes to `spots`; unauthenticated writes failed silently and logged the warning
+- Fix: added `if (!user) return` guard and changed `useEffect` dependency from `[]` → `[user]`
+
+**iOS external URL sandbox error fixed:**
+- `window.open(url, '_blank')` tries to open a new WKWebView window; iOS sandbox blocks external URLs in new windows
+- Changed all external `window.open` calls to `window.open(url, '_system')` — Capacitor routes `_system` through iOS's native URL handler (Safari / Apple Maps / Mail / WhatsApp)
+- Files changed: `SpotDetailScreen.jsx`, `SettingsScreen.jsx`, `AuthScreen.jsx`
+- Maps button specifically changed to `maps://` scheme (`maps://?ll=lat,lng&q=SpotName`) to open Apple Maps natively without going through Safari
+
+**External URL pattern for Capacitor (use this going forward):**
+```js
+// Always use '_system' for external URLs in Capacitor — never '_blank'
+window.open('https://...', '_system');          // Opens in Safari
+window.open('maps://?ll=lat,lng&q=Name', '_system');  // Opens Apple Maps
+window.open('mailto:...', '_system');            // Opens Mail
+window.open('https://wa.me/...', '_system');     // Opens WhatsApp
+```
+
+**Also added this session:**
 - **`public/index.html`** — single-file marketing website, no build step, no external frameworks
 - Sections: Nav, Hero (phone mockup), How it Works, What You'll Find (5 category cards), About, Download (App Store + Google Play badges), Footer
 - Stack: HTML + inline CSS + 6-line JS (IntersectionObserver fade-in). Font: Outfit via Google Fonts. Colors: `#0D0D0D` bg / `#F5C518` gold.
 - App Store / Google Play links are `#` placeholders — replace with real store URLs when app is published.
-- `public/privacy.html` and `public/terms.html` were pre-existing — not touched.
 
 ---
 
