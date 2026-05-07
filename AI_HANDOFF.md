@@ -1,6 +1,6 @@
 # AI Handoff — EgySpots (Read This First, Every Session)
 
-Last updated: 2026-05-06 (session 13)
+Last updated: 2026-05-07 (session 14)
 
 ---
 
@@ -126,7 +126,7 @@ egyspots-c/
 │   └── tsconfig.json
 │
 ├── public/
-│   ├── index.html           # Marketing website (single-file, no build step)
+│   ├── index.html           # Marketing website (single-file, no build step). App Store link live: https://apps.apple.com/us/app/egyspots/id6766826786
 │   ├── privacy.html
 │   └── terms.html
 │
@@ -499,6 +499,14 @@ MIN_SPOT_DISTANCE_M = 300   // new spots must be ≥300m from any existing spot
 
 ## Change Log
 
+### 2026-05-07 (session 14) — App Store link live + full GitHub push
+
+- **App Store link** added to marketing website: both hero buttons and download-section badges in `public/index.html` now point to `https://apps.apple.com/us/app/egyspots/id6766826786`. Google Play link remains `#` until Android release.
+- **Firebase Hosting** redeployed via `firebase deploy --only hosting` — link is live on the marketing site.
+- **GitHub push**: all session 12–14 changes committed and pushed to `main` (25 files, +1127 / -554 lines). Repository is fully up to date.
+
+---
+
 ### 2026-05-06 (session 13) — All deployment steps completed
 
 All pending infrastructure and iOS tasks completed:
@@ -614,7 +622,7 @@ window.open('https://wa.me/...', '_system');     // Opens WhatsApp
 - **`public/index.html`** — single-file marketing website, no build step, no external frameworks
 - Sections: Nav, Hero (phone mockup), How it Works, What You'll Find (5 category cards), About, Download (App Store + Google Play badges), Footer
 - Stack: HTML + inline CSS + 6-line JS (IntersectionObserver fade-in). Font: Outfit via Google Fonts. Colors: `#0D0D0D` bg / `#F5C518` gold.
-- App Store / Google Play links are `#` placeholders — replace with real store URLs when app is published.
+- App Store link updated to `https://apps.apple.com/us/app/egyspots/id6766826786` (live as of 2026-05-07). Google Play link is still `#` placeholder — no Android release yet.
 
 ---
 
