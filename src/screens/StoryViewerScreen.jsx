@@ -12,11 +12,12 @@ export default function StoryViewerScreen({ spotId, initialIndex = 0, onClose, o
   const { storiesBySpot, markViewed } = useStories();
   const { user } = useAuth();
   const stories = storiesBySpot[spotId] || [];
-  const [idx, setIdx] = useState(initialIndex);
-  const [paused, setPaused] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [idx,          setIdx]          = useState(initialIndex);
+  const [paused,       setPaused]       = useState(false);
+  const [progress,     setProgress]     = useState(0);
+  const [imageLoaded,  setImageLoaded]  = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
-  const intervalRef = useRef(null);
+  const intervalRef   = useRef(null);
   const touchStartRef = useRef({ x: 0, y: 0, time: 0 });
   const current = stories[idx];
 
@@ -29,10 +30,21 @@ export default function StoryViewerScreen({ spotId, initialIndex = 0, onClose, o
     setProgress(0);
   }, [stories.length, onClose]);
 
+  // Reset loaded state and preload next image whenever story changes
   useEffect(() => {
-    if (!current || paused) return;
-    markViewed(current.id);
+    setImageLoaded(!current?.photoURL); // no URL = instantly "loaded"
     setProgress(0);
+    const next = stories[idx + 1];
+    if (next?.photoURL) {
+      const img = new Image();
+      img.src = next.photoURL;
+    }
+  }, [idx]);
+
+  // Progress timer — only runs once image is ready
+  useEffect(() => {
+    if (!current || paused || !imageLoaded) return;
+    markViewed(current.id);
     const start = Date.now();
     intervalRef.current = setInterval(() => {
       const elapsed = Date.now() - start;
@@ -44,7 +56,7 @@ export default function StoryViewerScreen({ spotId, initialIndex = 0, onClose, o
       }
     }, 50);
     return () => clearInterval(intervalRef.current);
-  }, [idx, paused, current, advance, markViewed]);
+  }, [idx, paused, imageLoaded, current, advance, markViewed]);
 
   if (!current) { onClose(); return null; }
 
@@ -80,9 +92,27 @@ export default function StoryViewerScreen({ spotId, initialIndex = 0, onClose, o
     >
       {/* Photo */}
       {current.photoURL
-        ? <img src={current.photoURL} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        ? <img
+            key={current.id}
+            src={current.photoURL}
+            alt=""
+            onLoad={() => setImageLoaded(true)}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: imageLoaded ? 1 : 0, transition: 'opacity 0.2s' }}
+          />
         : <div style={{ position: 'absolute', inset: 0, background: t.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48 }}>📍</div>
       }
+
+      {/* Loading spinner — shown until image is ready */}
+      {current.photoURL && !imageLoaded && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#111' }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: '50%',
+            border: '3px solid rgba(255,255,255,0.15)',
+            borderTopColor: 'white',
+            animation: 'spin 0.7s linear infinite',
+          }} />
+        </div>
+      )}
 
       {/* Dark overlay */}
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.7) 100%)' }} />

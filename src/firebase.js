@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { initializeAuth, inMemoryPersistence, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeAuth, browserLocalPersistence, GoogleAuthProvider } from 'firebase/auth';
+import { initializeFirestore } from 'firebase/firestore'; // Changed from getFirestore
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -14,11 +14,16 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// initializeAuth (not getAuth) sets persistence BEFORE Firebase starts its
-// internal queue. getAuth() immediately begins IndexedDB/localStorage init and
-// queues every subsequent operation (including sign-in) behind it — that's what
-// causes the infinite hang in WKWebView on iOS.
-export const auth    = initializeAuth(app, { persistence: inMemoryPersistence });
-export const db      = getFirestore(app);
+// 1. Auth: browserLocalPersistence uses localStorage (not IndexedDB) — persists across
+//    app restarts without the WKWebView hang that indexedDBLocalPersistence causes.
+export const auth = initializeAuth(app, { persistence: browserLocalPersistence });
+
+// 2. Firestore: long-polling prevents WKWebView from killing the real-time stream.
+//    ignoreUndefinedProperties avoids runtime errors on partial documents.
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+  ignoreUndefinedProperties: true,
+});
+
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();

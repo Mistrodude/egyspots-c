@@ -1,6 +1,6 @@
 # AI Handoff — EgySpots (Read This First, Every Session)
 
-Last updated: 2026-05-01 (session 10)
+Last updated: 2026-05-06 (session 13)
 
 ---
 
@@ -25,6 +25,8 @@ Think "Snapchat Maps meets street culture." Core loop: open map → see what's l
 | Styling | Inline styles only | All styles are inline JS objects using theme tokens from `src/theme.js` via `useTheme()`. Zero CSS classes, zero Tailwind. |
 | Maps | Leaflet + CARTO tiles | Free. Dark tiles: `cartocdn.com/dark_all`. Light: OpenStreetMap. No Mapbox. |
 | Backend | Firebase (`egyspots-dc9c1`) | Firestore, Auth (email + Google + Apple), Storage. Spark (free) tier. |
+| Native auth (iOS) | `@codetrix-studio/capacitor-google-auth` + `@capacitor-community/apple-sign-in` | Google uses custom `GoogleAuthPlugin.swift` (wraps GIDSignIn via SPM); Apple uses Capacitor SPM plugin. Both wired in `AuthContext`. |
+| Native camera (iOS) | `@capacitor/camera` | Used for Camera button in `AddStoryScreen`. Gallery button still uses `<input type="file">`. |
 | Mobile | Capacitor v8 | Config: `capacitor.config.json`. |
 | State | React Context API | 5 contexts: `AuthContext`, `SpotsContext`, `ThemeContext`, `NotificationsContext`, `StoriesContext`. |
 | Tests | Vitest + @testing-library/react | Config: `vitest.config.js`. Run from terminal: `npm test`. Cannot run inside Claude Code's bash sandbox (IPC restriction). |
@@ -72,7 +74,7 @@ egyspots-c/
 │   │   ├── SpotsContext.jsx         # Firestore spots listener + checkIn() + submitReport() + checkinHistory
 │   │   ├── ThemeContext.jsx         # Dark/light toggle; exposes t (tokens), isDark, toggleTheme
 │   │   ├── NotificationsContext.jsx # Listens to notifications/{id}; exposes unreadCount, markRead, markAllRead
-│   │   └── StoriesContext.jsx       # Listens to stories where expiresAt > now; storiesBySpot map
+│   │   └── StoriesContext.jsx       # Listens to stories where expiresAt > now; storiesBySpot map. No demo seeding — starts empty.
 │   │
 │   ├── utils/
 │   │   ├── geo.js                   # haversineMeters(a,b), CHECKIN_RADIUS_M=200, STORY_RADIUS_M=300, MIN_SPOT_DISTANCE_M=300
@@ -251,7 +253,8 @@ User's existing rating is loaded on mount. Changing rating correctly updates the
 
 `SpotsContext` runs `syncSeeds()` after auth resolves (requires `user` — Firestore rules block unauthenticated writes):
 - If `spots` collection is **empty** → batch-creates all SPOTS_SEED docs
-- If spots **exist** → back-fills missing `description` / `operatingHours` on seed docs only (idempotent, uses writeBatch)
+- If spots **exist** → does nothing (no back-fill; those were removed in session 12 because they failed with Firestore permissions — seed docs have `founderId == 'seed_founder'` which no regular user can update)
+- Guards with `localStorage.getItem('spots_seeded')` — skips the Firestore read entirely on subsequent logins; sets the flag after the first successful check
 - `useEffect` dependency is `[user]` — will not run until a user is signed in
 
 ---
@@ -268,14 +271,14 @@ Two-finger twist gesture rotates the map. Implementation:
 
 ## Firebase Auth — Capacitor / WKWebView Notes
 
-**`src/firebase.js`** — uses `initializeAuth` with `inMemoryPersistence`:
+**`src/firebase.js`** — uses `initializeAuth` with `browserLocalPersistence`:
 ```js
-export const auth = initializeAuth(app, { persistence: inMemoryPersistence });
+export const auth = initializeAuth(app, { persistence: browserLocalPersistence });
 ```
-**Do NOT switch to `getAuth()`** — it starts IndexedDB immediately, which silently hangs WKWebView on iOS.
-Tradeoff: users must re-login each app open (no session persistence).
+**Do NOT switch to `getAuth()` or `indexedDBLocalPersistence`** — IndexedDB initialization silently hangs WKWebView on iOS.
+`browserLocalPersistence` uses `localStorage` instead — persists across app restarts with no hang. Users stay signed in.
 
-**`src/context/AuthContext.jsx`** — 3-second fallback timeout on `onAuthStateChanged`.
+**`src/context/AuthContext.jsx`** — 3-second fallback timeout on `onAuthStateChanged`. With `browserLocalPersistence`, a signed-in user will trigger `onAuthStateChanged` quickly (localStorage read is synchronous); the fallback is just a safety net.
 
 **`src/context/SpotsContext.jsx`** — `loading` starts as `false`; `SPOTS_SEED` pre-populates immediately.
 
@@ -347,9 +350,67 @@ Saved to Firestore via `updateDoc` including `operatingHours` object.
 
 ---
 
+## Native Social Auth (iOS) — Architecture
+
+Both Google and Apple sign-in work natively on iOS. The JS layer detects `Capacitor.isNativePlatform()` and routes to native; web uses Firebase popup.
+
+### Google Sign-in (iOS native)
+- **Plugin:** `@codetrix-studio/capacitor-google-auth` (npm, JS layer only)
+- **Native implementation:** `ios/App/App/GoogleAuthPlugin.swift` — a custom Capacitor plugin (`@objc(GoogleAuth)`) wrapping `GIDSignIn.sharedInstance.signIn(withPresenting:)`. Lives in the App target (not CapApp-SPM) so it's not overwritten by `cap sync`.
+- **SDK:** `https://github.com/google/GoogleSignIn-iOS` — added to Xcode project manually via File → Add Package Dependencies → add to **App** target.
+- **AppDelegate.swift:** reads `CLIENT_ID` from bundled `GoogleService-Info.plist` (tries both "GoogleService-Info" and "GoogleService-Info (2)") → sets `GIDSignIn.sharedInstance.configuration`. Also routes OAuth URL callback via `GIDSignIn.sharedInstance.handle(url)`.
+- **Info.plist:** `CFBundleURLSchemes` contains `REVERSED_CLIENT_ID` (`com.googleusercontent.apps.420301077742-v9eaft2iknq2snq278e63oplvisb00qc`) for the OAuth redirect back to the app.
+- **⚠️ GoogleService-Info.plist mismatch:** current plist has `BUNDLE_ID = com.mohamedkamel.egyspots` but app is `com.egyspots.app`. Must re-register iOS app in Firebase Console with `com.egyspots.app` and download new plist before Google Sign-in will work in production.
+
+### Apple Sign-in (iOS native)
+- **Plugin:** `@capacitor-community/apple-sign-in@7.1.0` — wired via SPM in `CapApp-SPM/Package.swift`.
+- **SPM compatibility fix:** the plugin's `Package.swift` in `node_modules` was patched from `from: "7.0.0"` → `from: "8.0.0"` to resolve a conflict with Capacitor 8's `exact: "8.3.1"` requirement. **This patch lives in node_modules and will be lost after `npm install`.** If lost, re-run `npx cap sync ios` then re-apply:
+  ```
+  node_modules/@capacitor-community/apple-sign-in/Package.swift
+  line: .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "7.0.0")
+  change to: from: "8.0.0"
+  ```
+  Then delete `ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` and resolve packages in Xcode.
+- **Entitlements:** `ios/App/App/App.entitlements` has `com.apple.developer.applesignin = ["Default"]` and is referenced in `project.pbxproj` (`CODE_SIGN_ENTITLEMENTS = App/App.entitlements`).
+- **Nonce security:** `signInApple()` generates a raw nonce, SHA-256 hashes it, sends the hash to Apple, passes the raw nonce to Firebase for verification.
+- Must enable Apple sign-in provider in Firebase Console → Auth → Sign-in method → Apple (requires Services ID from Apple Developer Portal).
+
+### AuthContext sign-in flow
+```js
+// Google
+const googleUser = await GoogleAuth.signIn();   // native: GIDSignIn
+const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
+return signInWithCredential(auth, credential);
+
+// Apple
+const { response } = await SignInWithApple.authorize({ clientId, redirectURI, scopes, nonce: hashedNonce });
+const credential = new OAuthProvider('apple.com').credential({ idToken: response.identityToken, rawNonce });
+return signInWithCredential(auth, credential);
+```
+
+`GoogleAuth.initialize()` is called inside `useEffect` with `.catch(() => {})` — **not at module scope, and not with try/catch** (try/catch only handles synchronous throws; initialize() returns a Promise). This prevents an unhandled rejection crash at load time if the native plugin isn't registered.
+
+---
+
+## Capacitor iOS — SPM Architecture
+
+The project uses **Swift Package Manager** (not CocoaPods). No Podfile exists.
+
+- **`ios/App/CapApp-SPM/Package.swift`** — managed by `cap sync`. Do not manually edit; changes are overwritten on next sync. Contains: `capacitor-swift-pm` (exact 8.3.1) + `CapacitorCommunityAppleSignIn` (local path) + `CapacitorCamera` (local path).
+- **`ios/App/App/GoogleAuthPlugin.swift`** — custom native plugin in the App target. Safe from `cap sync` overwrites.
+- **`ios/App/App/AppDelegate.swift`** — configures GIDSignIn on launch; handles Google OAuth URL callback.
+
+After any `npm install` that touches Capacitor plugins, run:
+```bash
+npm run build && npx cap sync ios
+```
+Then in Xcode: File → Packages → Reset Package Caches → Resolve Package Versions → Cmd+B.
+
+---
+
 ## Auth — Sign in with Apple
 
-Required by App Store. Uses `OAuthProvider('apple.com')` with dynamic import. Must be enabled in Firebase Console → Auth → Sign-in providers. Requires Apple Developer Program ($99/year) with Services ID configured.
+Required by App Store (Guideline 4.8) when any third-party social login is offered. Uses native `ASAuthorizationAppleIDProvider` via `@capacitor-community/apple-sign-in` on iOS; web uses `signInWithPopup` with `OAuthProvider('apple.com')`. Must be enabled in Firebase Console → Auth → Sign-in providers. Requires Apple Developer Program ($99/year) with Services ID configured in Apple Developer Portal.
 
 ---
 
@@ -380,13 +441,13 @@ Mac IP: `ipconfig getifaddr en0` (Wi-Fi) or `en1`.
 
 ## Pending Deployment Steps (manual — not done yet)
 
-1. **Enable Apple Sign-in** in Firebase Console → Auth → Sign-in providers
-2. ~~**Deploy Firestore rules**~~ ✅ Done 2026-05-01 — `firestore.rules` is live on `egyspots-dc9c1`
-3. **Deploy Storage rules** — first enable Firebase Storage: go to Firebase Console → Storage → Get Started, then run `firebase deploy --only storage`. The `storage.rules` file and `firebase.json` storage entry are already configured.
-4. **Deploy Cloud Functions**: `cd functions && npm install && cd .. && firebase deploy --only functions`
-5. **Set Firestore TTL** on `stories.expiresAt` — Firebase Console → Firestore → TTL policies → Collection: `stories`, field: `expiresAt`
-6. **Deploy hosting**: `firebase deploy --only hosting`
-7. **Add iOS/Android**: `npx cap add ios && npx cap add android && npx cap sync`
+1. ~~**Enable Apple Sign-in**~~ ✅ Done 2026-05-06 — Firebase Console → Auth → Sign-in providers
+2. ~~**Deploy Firestore rules**~~ ✅ Done 2026-05-01
+3. ~~**Deploy Storage rules**~~ ✅ Done 2026-05-06 — `firebase deploy --only storage` succeeded
+4. ~~**Deploy Cloud Functions**~~ ✅ Done 2026-05-06 — `firebase deploy --only functions`
+5. ~~**Set Firestore TTL**~~ ✅ Done 2026-05-06 — `stories.expiresAt` TTL policy set in Firebase Console
+6. ~~**Deploy hosting**~~ ✅ Done 2026-05-06 — `firebase deploy --only hosting`
+7. ~~**Re-register iOS app in Firebase**~~ ✅ Done 2026-05-06 — new `GoogleService-Info.plist` downloaded and replaced in `ios/App/App/`
 
 **Xcode**: always **Cmd+Shift+K** (clean build) after `npm run build && npx cap sync ios`.
 
@@ -437,6 +498,95 @@ MIN_SPOT_DISTANCE_M = 300   // new spots must be ≥300m from any existing spot
 ---
 
 ## Change Log
+
+### 2026-05-06 (session 13) — All deployment steps completed
+
+All pending infrastructure and iOS tasks completed:
+
+- **Apple Sign-in** enabled in Firebase Console → Auth → Sign-in providers
+- **Cloud Functions** deployed: `firebase deploy --only functions` (`deleteUserData` v2 onCall live)
+- **Firestore TTL** policy set on `stories.expiresAt` in Firebase Console → Firestore → TTL policies
+- **Firebase Hosting** deployed: `firebase deploy --only hosting` (marketing site live)
+- **iOS re-registered** in Firebase Console with bundle ID `com.egyspots.app`; new `GoogleService-Info.plist` downloaded and replaced in `ios/App/App/`
+- **GoogleSignIn framework** added to App target in Xcode (Frameworks, Libraries, and Embedded Content)
+- **Sign in with Apple capability** added in Xcode → Signing & Capabilities
+- **App icons** replaced with real 1024×1024 PNG in Xcode Assets
+
+**Still pending:** App Store Connect listing (description, keywords, screenshots, age rating, export compliance) + demo reviewer account.
+
+---
+
+### 2026-05-06 (session 12) — Camera permission popup fix + Firestore permission error fix
+
+**Camera permission popup not appearing (fixed):**
+- Root cause: `<input type="file" accept="image/*" capture="environment">` in AddStoryScreen's Camera button bypasses iOS's permission gating in WKWebView — the camera opens without requesting permission, then immediately fails with "not authorized"
+- Fix: installed `@capacitor/camera` and replaced the Camera button on native with `Camera.getPhoto({ source: CameraSource.Camera })`. iOS now shows the standard camera permission dialog before opening the camera
+- Gallery button kept as `<input type="file">` (no capture) — this opens the iOS photo picker correctly and already works
+- Other screens (`EditProfileScreen`, `AddSpotScreen`, `EditSpotScreen`, `SpotDetailScreen`) use plain `<input type="file">` without capture — these show the iOS photo picker and are unaffected
+- `@capacitor/camera` installed with `--legacy-peer-deps` (due to `@codetrix-studio/capacitor-google-auth` peer dep conflict with Capacitor 8)
+- `@capacitor/camera`'s own `Package.swift` already uses `from: "8.0.0"` — no patch needed
+- `cap sync` auto-added `CapacitorCamera` to `ios/App/CapApp-SPM/Package.swift`
+
+**Firestore "Missing or insufficient permissions" fixed:**
+- Root cause: `SpotsContext.syncSeeds()` had an `else` block that tried to `batch.update()` seed spots with `founderId == 'seed_founder'`. Firestore rules only allow update if you own the spot, so this always failed for regular users
+- Fix: removed the back-fill `else` block entirely (migration is done; no legitimate reason for clients to back-fill fields on seed docs)
+- Also added `localStorage.getItem('spots_seeded')` guard so the entire seed check is skipped on every login after the first — avoids a `getDocs(collection(db, 'spots'))` read on every sign-in
+
+**Apple Sign-in confirmed working:**
+- iOS console log confirmed: `TO JS {"response":{"user":"001793...","givenName":"Mohamed","familyName":"Kamel","email":"mohamedkamel146@gmail.com"...}}`
+
+**UNHANDLED REJECTION confirmed fixed:**
+- `.catch(() => {})` on `GoogleAuth.initialize()` (applied session 11) verified working — no longer appears in device logs
+- Clarification: `try/catch` around a Promise call does NOT catch async rejections. Must use `.catch()` or `await` inside a try/catch.
+
+**Auth persistence fixed — users stay signed in across app restarts:**
+- Root cause: `inMemoryPersistence` stores auth state only in JS memory; when iOS kills the WKWebView process, the session is lost
+- Fix: switched from `inMemoryPersistence` → `browserLocalPersistence` in `src/firebase.js`
+- `browserLocalPersistence` uses `localStorage` (not IndexedDB), which persists across app restarts and does NOT cause the WKWebView hang that `indexedDBLocalPersistence` / `getAuth()` cause
+- Users now stay signed in until they explicitly sign out
+
+**Comprehensive bug fixes (codebase audit):**
+- `ChatScreen.jsx`: input bar was missing `env(safe-area-inset-bottom)` — home indicator overlapped the text input on iPhone X+; also added `overflow: hidden` to root container; fixed `spot.checkins || 0` (was "undefined people here" when field absent)
+- `StoriesTab.jsx`: header used hardcoded `padding: '60px 16px 12px'` — overlapped notch on newer iPhones; changed to `calc(env(safe-area-inset-top, 44px) + 16px)`
+- `OnboardingScreen.jsx`: skip button used hardcoded `padding: '56px 20px 0'`; changed to `calc(env(safe-area-inset-top, 44px) + 12px)`
+- `ExploreScreen.jsx`: search bar floating over map used `top: 62` (breaks on Dynamic Island phones); changed to `calc(env(safe-area-inset-top, 44px) + 18px)`
+- `AddSpotScreen.jsx`: photo size error used `alert()` (blocks iOS UI); replaced with `setMsg()`
+- `SpotDetailScreen.jsx`: photo upload size error used `alert()`; added `photoMsg` state, replaced with inline error text
+- `SpotsContext.jsx`: checkin data wrote `ownerId: spot?.ownerId` (always null — spots have `founderId`); fixed to `founderId: spot?.founderId`
+
+---
+
+### 2026-05-06 (session 11) — Apple App Store compliance + native Google/Apple sign-in
+
+**Apple App Store compliance fixes:**
+- `ios/App/App/Info.plist`: removed `NSAllowsArbitraryLoads` (automatic rejection trigger); removed empty `UIStatusBarStyle` string; restricted to portrait-only (removed LandscapeLeft/LandscapeRight); added `CFBundleURLSchemes` with `REVERSED_CLIENT_ID` for Google OAuth redirect
+- `src/screens/AuthScreen.jsx`: social login buttons (Google + Apple) are now hidden entirely on native iOS when not functional — replaced by fully working native implementations (see below); phone number made optional (was blocking App Store reviewers who can't provide Egyptian numbers)
+- `src/context/StoriesContext.jsx`: removed all `MOCK_STORIES_LIVE` and `seedDemoStories` — fake "EgySpots Demo" stories were being seeded for every new user, violating App Store Guideline 4.3. Stories list now starts empty and fills from Firestore only.
+- `src/context/AuthContext.jsx`: `signInApple` cleaned up; `GoogleAuth.initialize()` moved inside `useEffect` with `try/catch` (was at module scope, causing unhandled rejection crash if native plugin not registered)
+- `src/screens/SettingsScreen.jsx`: WhatsApp support number updated to `+201099091378`
+- Firebase Storage: deployed `storage.rules` via `firebase deploy --only storage`
+
+**Native Google + Apple sign-in implemented:**
+- Installed `@codetrix-studio/capacitor-google-auth` + `@capacitor-community/apple-sign-in` via npm
+- `ios/App/App/GoogleAuthPlugin.swift` (new): custom Capacitor plugin (`@objc(GoogleAuth)`) wrapping `GIDSignIn`. Lives in App target — not overwritten by `cap sync`.
+- `ios/App/App/AppDelegate.swift`: imports `GoogleSignIn`, reads `CLIENT_ID` from bundled plist, configures `GIDSignIn`, handles OAuth URL callback
+- `ios/App/CapApp-SPM/Package.swift`: `cap sync` added `CapacitorCommunityAppleSignIn` as local SPM dependency
+- `node_modules/@capacitor-community/apple-sign-in/Package.swift`: patched `from: "7.0.0"` → `from: "8.0.0"` to resolve SPM version conflict with Capacitor 8 (patch lost on `npm install` — see SPM architecture section above)
+- `ios/App/App/App.entitlements`: `com.apple.developer.applesignin` capability present and referenced in `project.pbxproj`
+- `capacitor.config.json`: added `plugins.GoogleAuth` scopes config
+- User must add `https://github.com/google/GoogleSignIn-iOS` SPM package to Xcode project (File → Add Package Dependencies → add to **App** target) for `GoogleAuthPlugin.swift` to compile
+
+**Remaining before App Store submission:**
+- ~~Add `GoogleSignIn` framework to App target in Xcode~~ ✅ Done 2026-05-06
+- ~~Add "Sign in with Apple" capability in Xcode → Signing & Capabilities~~ ✅ Done 2026-05-06
+- ~~Re-register iOS app in Firebase Console with `com.egyspots.app`, download new `GoogleService-Info.plist`~~ ✅ Done 2026-05-06
+- ~~Enable Apple sign-in provider in Firebase Console → Auth~~ ✅ Done 2026-05-06
+- ~~App icons: replace `tmpjz82mr4l (1).png` with real 1024×1024 PNG in Xcode Assets~~ ✅ Done 2026-05-06
+- ~~Set Firestore TTL policy on `stories.expiresAt`~~ ✅ Done 2026-05-06
+- **App Store Connect** (still pending): description, keywords, support URL, screenshots (6.7" + 5.5"), age rating, export compliance
+- **Create demo reviewer account** (`reviewer@egyspots.com`) and add credentials to App Review Notes
+
+---
 
 ### 2026-05-01 (session 10) — iOS log fixes: Firestore permissions + external URL sandbox
 

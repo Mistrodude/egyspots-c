@@ -29,7 +29,7 @@ export default function StoriesTab({ onSpotPress, onAddStory, onRequireAuth }) {
   return (
     <div style={{ height: '100%', background: t.bg, display: 'flex', flexDirection: 'column', fontFamily: 'Outfit, sans-serif' }}>
       {/* Header */}
-      <div style={{ padding: '60px 16px 12px', borderBottom: `1px solid ${t.border}` }}>
+      <div style={{ padding: 'calc(env(safe-area-inset-top, 44px) + 16px) 16px 12px', borderBottom: `1px solid ${t.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 22, fontWeight: 900, color: t.text }}>Stories</div>
           <button

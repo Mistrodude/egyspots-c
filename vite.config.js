@@ -12,6 +12,7 @@ export default defineConfig({
     port: 4173,
   },
   build: {
+    target: 'esnext',
     outDir: 'dist',
     rollupOptions: {
       output: {

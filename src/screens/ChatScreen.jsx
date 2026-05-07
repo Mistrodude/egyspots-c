@@ -7,8 +7,9 @@ import { db } from '../firebase';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/Avatar';
-import { SpotIcon, BackIcon, MoreIcon, SendIcon, CameraIcon } from '../components/Icons';
+import { SpotIcon, BackIcon, MoreIcon, SendIcon } from '../components/Icons';
 import { useStories } from '../context/StoriesContext';
+import ReportModal from '../components/ReportModal';
 
 function getInitials(name = '') {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || '??';
@@ -19,9 +20,30 @@ export default function ChatScreen({ spot, onBack }) {
   const { user } = useAuth();
   const { storiesBySpot } = useStories();
   const spotStories = storiesBySpot[spot?.id] || [];
-  const [messages, setMessages] = useState([]);
-  const [input,    setInput]    = useState('');
-  const bottomRef = useRef(null);
+  const myUid = user?.uid || null;
+
+  const [messages,        setMessages]        = useState([]);
+  const [input,           setInput]           = useState('');
+  const [reportMsg,       setReportMsg]       = useState(null);
+  const [reportSpotOpen,  setReportSpotOpen]  = useState(false);
+  const [menuMsg,         setMenuMsg]         = useState(null);
+  const [pressingId,      setPressingId]      = useState(null);
+  const [spotMenuOpen,    setSpotMenuOpen]    = useState(false);
+  const bottomRef  = useRef(null);
+  const pressTimer = useRef(null);
+
+  const startPress = (msg) => {
+    if (msg.userId === myUid) return;
+    setPressingId(msg.id);
+    pressTimer.current = setTimeout(() => {
+      setPressingId(null);
+      setMenuMsg(msg);
+    }, 500);
+  };
+  const cancelPress = () => {
+    clearTimeout(pressTimer.current);
+    setPressingId(null);
+  };
 
   // Real-time Firestore listener
   useEffect(() => {
@@ -57,10 +79,8 @@ export default function ChatScreen({ spot, onBack }) {
 
   const handleKey = (e) => { if (e.key === 'Enter') send(); };
 
-  const myUid = user?.uid || null;
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: t.bg }} className="anim-slideInRight">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: t.bg, overflow: 'hidden' }} className="anim-slideInRight">
 
       {/* Header */}
       <div style={{ background: t.surface, borderBottom: `1px solid ${t.border}`, flexShrink: 0 }}>
@@ -74,9 +94,11 @@ export default function ChatScreen({ spot, onBack }) {
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: t.text }}>{spot.name}</div>
-          <div style={{ fontSize: 10, color: '#4A9E6B', fontWeight: 600 }}>● {spot.checkins} people here</div>
+          <div style={{ fontSize: 10, color: '#4A9E6B', fontWeight: 600 }}>● {spot.checkins || 0} people here</div>
         </div>
-        <MoreIcon color={t.muted} size={20} />
+        <button onClick={() => setSpotMenuOpen(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}>
+          <MoreIcon color={t.muted} size={20} />
+        </button>
         </div>
       </div>
 
@@ -107,7 +129,7 @@ export default function ChatScreen({ spot, onBack }) {
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, scrollbarWidth: 'none' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, scrollbarWidth: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}>
         <div style={{ textAlign: 'center', fontSize: 10, color: t.muted, padding: '4px 12px', background: t.surface2, borderRadius: 20, alignSelf: 'center' }}>
           Tonight · {spot.name}
         </div>
@@ -120,7 +142,21 @@ export default function ChatScreen({ spot, onBack }) {
         {messages.map((m) => {
           const isMe = m.userId === myUid;
           return (
-            <div key={m.id} style={{ display: 'flex', gap: 8, justifyContent: isMe ? 'flex-end' : 'flex-start' }} className="anim-fadeUp">
+            <div
+              key={m.id}
+              style={{
+                display: 'flex', gap: 8,
+                justifyContent: isMe ? 'flex-end' : 'flex-start',
+                userSelect: 'none',
+                transform: pressingId === m.id ? 'scale(0.96)' : 'scale(1)',
+                transition: 'transform 0.15s',
+              }}
+              className="anim-fadeUp"
+              onTouchStart={() => startPress(m)}
+              onTouchEnd={cancelPress}
+              onTouchMove={cancelPress}
+              onContextMenu={(e) => { if (!isMe) { e.preventDefault(); setMenuMsg(m); } }}
+            >
               {!isMe && <Avatar initials={m.userAvatar || '??'} size={28} color={t.accent} bg={t.accentBg} />}
               <div style={{ maxWidth: '72%' }}>
                 {!isMe && (
@@ -152,7 +188,7 @@ export default function ChatScreen({ spot, onBack }) {
       </div>
 
       {/* Input */}
-      <div style={{ padding: '10px 12px', background: t.navBg, backdropFilter: 'blur(12px)', borderTop: `1px solid ${t.border}`, flexShrink: 0, display: 'flex', gap: 10, alignItems: 'center' }}>
+      <div style={{ padding: '10px 12px', paddingBottom: 'max(10px, env(safe-area-inset-bottom, 10px))', background: t.navBg, backdropFilter: 'blur(12px)', borderTop: `1px solid ${t.border}`, flexShrink: 0, display: 'flex', gap: 10, alignItems: 'center' }}>
         <div style={{ flex: 1, background: t.surface, borderRadius: 24, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${t.border}` }}>
           <input
             value={input}
@@ -162,9 +198,6 @@ export default function ChatScreen({ spot, onBack }) {
             disabled={!user}
             style={{ flex: 1, border: 'none', background: 'none', outline: 'none', fontSize: 13, color: t.text, fontFamily: 'Outfit, sans-serif' }}
           />
-          <span style={{ opacity: 0.5, cursor: 'pointer', display: 'flex' }}>
-            <CameraIcon color={t.muted} size={17} />
-          </span>
         </div>
         <button onClick={send} disabled={!input.trim() || !user} style={{
           width: 40, height: 40, borderRadius: '50%',
@@ -177,6 +210,104 @@ export default function ChatScreen({ spot, onBack }) {
           <SendIcon color="white" size={15} />
         </button>
       </div>
+
+      {/* Spot action sheet — opened from ⋯ button */}
+      {spotMenuOpen && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.45)' }}
+          onClick={() => setSpotMenuOpen(false)}
+        >
+          <div
+            style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: t.surface, borderRadius: '20px 20px 0 0', padding: '12px 16px 32px', fontFamily: 'Outfit, sans-serif' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: t.border, margin: '0 auto 16px' }} />
+            <div style={{ fontSize: 13, fontWeight: 700, color: t.text, marginBottom: 12 }}>{spot.name}</div>
+            <button
+              onClick={() => { setReportSpotOpen(true); setSpotMenuOpen(false); }}
+              style={{ width: '100%', padding: '13px 0', borderRadius: 12, background: '#ef444415', color: '#ef4444', border: '1px solid #ef444430', fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+            >
+              🚩 Report this Spot
+            </button>
+            <button
+              onClick={() => setSpotMenuOpen(false)}
+              style={{ width: '100%', marginTop: 8, padding: '13px 0', borderRadius: 12, background: 'transparent', color: t.muted, border: 'none', fontFamily: 'Outfit, sans-serif', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Action sheet — shown after long-press, before full report modal */}
+      {menuMsg && !reportMsg && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.45)' }}
+          onClick={() => setMenuMsg(null)}
+        >
+          <div
+            style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0,
+              background: t.surface, borderRadius: '20px 20px 0 0',
+              padding: '12px 16px 32px',
+              fontFamily: 'Outfit, sans-serif',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: t.border, margin: '0 auto 16px' }} />
+            <div style={{ fontSize: 11, color: t.muted, marginBottom: 10, paddingLeft: 4 }}>
+              Message from {menuMsg.userName}
+            </div>
+            <div style={{
+              background: t.bg, borderRadius: 10, padding: '10px 12px',
+              fontSize: 12, color: t.text, marginBottom: 16,
+              border: `1px solid ${t.border}`, lineHeight: 1.4,
+            }}>
+              {menuMsg.text}
+            </div>
+            <button
+              onClick={() => { setReportMsg(menuMsg); setMenuMsg(null); }}
+              style={{
+                width: '100%', padding: '13px 0', borderRadius: 12,
+                background: '#ef444415', color: '#ef4444',
+                border: '1px solid #ef444430',
+                fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >
+              🚩 Report Message
+            </button>
+            <button
+              onClick={() => setMenuMsg(null)}
+              style={{
+                width: '100%', marginTop: 8, padding: '13px 0', borderRadius: 12,
+                background: 'transparent', color: t.muted,
+                border: 'none',
+                fontFamily: 'Outfit, sans-serif', fontWeight: 600, fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {reportMsg && (
+        <ReportModal
+          targetType="message"
+          targetId={`spots/${spot.id}/messages/${reportMsg.id}`}
+          onClose={() => setReportMsg(null)}
+        />
+      )}
+
+      {reportSpotOpen && (
+        <ReportModal
+          targetType="spot"
+          targetId={spot.id}
+          onClose={() => setReportSpotOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -16,6 +16,7 @@ const ERROR_MAP = {
   'auth/network-request-failed':                          'Network error. Check your connection.',
   'auth/popup-closed-by-user':                            'Sign-in popup was closed. Try again.',
   'auth/operation-not-supported-in-this-environment':     'Use email and password to sign in on the mobile app.',
+  'auth/operation-not-allowed':                           'Google sign-in is not enabled. Enable it in Firebase Console → Authentication → Sign-in method → Google.',
 };
 
 function parseError(e) {
@@ -91,7 +92,7 @@ export default function AuthScreen({ onBack }) {
     if (!/[A-Z]/.test(signupPassword))   return 'Password must contain at least one uppercase letter.';
     if (!/[0-9]/.test(signupPassword))   return 'Password must contain at least one number.';
     if (signupPassword !== confirmPass)  return 'Passwords do not match.';
-    if (!phone || phone.length < 8)      return 'Please enter a valid phone number.';
+    if (phone && phone !== '+20' && phone.length < 8) return 'Please enter a valid phone number.';
     if (!birthDate)                      return 'Please enter your date of birth.';
     const age = calcAge(birthDate);
     if (age < 13)                        return 'You must be 13 or older to use Egyspots.';
@@ -122,7 +123,7 @@ export default function AuthScreen({ onBack }) {
       await signUp(signupEmail.trim(), signupPassword, {
         displayName: name.trim(),
         username:    username.trim().toLowerCase(),
-        phoneNumber: phone,
+        phoneNumber: (phone && phone !== '+20') ? phone : null,
         birthDate,
         gender,
         city,
@@ -267,7 +268,7 @@ export default function AuthScreen({ onBack }) {
 
               <div style={{ position: 'relative' }}>
                 <input value={phone} onChange={(e) => setPhone(e.target.value)}
-                  type="tel" placeholder="+201001234567" style={inp} autoComplete="tel" />
+                  type="tel" placeholder="+201001234567 (optional)" style={inp} autoComplete="tel" />
               </div>
 
               <div>
@@ -366,21 +367,15 @@ export default function AuthScreen({ onBack }) {
             <div style={{ flex: 1, height: 1, background: t.border }} />
           </div>
 
-          {isNative && (
-            <div style={{ fontSize: 11, color: t.muted, textAlign: 'center', padding: '2px 0 4px', lineHeight: 1.5 }}>
-              Social sign-in is not available in the mobile app yet — use email and password above.
-            </div>
-          )}
-
           {/* Google */}
-          <button onClick={isNative ? undefined : handleGoogle} disabled={loading || isNative} style={{
+          <button onClick={handleGoogle} disabled={loading} style={{
             padding: 14, borderRadius: 16,
             background: t.surface, color: t.text,
             border: `1px solid ${t.border}`,
-            cursor: isNative ? 'default' : loading ? 'not-allowed' : 'pointer',
+            cursor: loading ? 'not-allowed' : 'pointer',
             fontFamily: 'Outfit, sans-serif', fontSize: 14, fontWeight: 600,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            opacity: isNative || loading ? 0.35 : 1,
+            opacity: loading ? 0.6 : 1,
           }}>
             <svg width="18" height="18" viewBox="0 0 48 48">
               <path fill="#EA4335" d="M24 9.5c3.3 0 6.3 1.1 8.7 3.3l6.5-6.5C35 2.8 29.9.5 24 .5 14.8.5 7 6.1 3.5 13.9l7.6 5.9C12.9 13.7 17.9 9.5 24 9.5z"/>
@@ -391,17 +386,17 @@ export default function AuthScreen({ onBack }) {
             Continue with Google
           </button>
 
-          {/* Apple */}
-          <button onClick={isNative ? undefined : handleApple} disabled={loading || isNative} style={{
+          {/* Apple — shown on all platforms; native uses ASAuthorizationAppleIDProvider */}
+          <button onClick={handleApple} disabled={loading} style={{
             padding: 14, borderRadius: 16,
-            background: isNative ? t.surface2 : '#000', color: isNative ? t.muted : '#fff',
-            border: isNative ? `1px solid ${t.border}` : '1px solid #000',
-            cursor: isNative ? 'default' : loading ? 'not-allowed' : 'pointer',
+            background: '#000', color: '#fff',
+            border: '1px solid #000',
+            cursor: loading ? 'not-allowed' : 'pointer',
             fontFamily: 'Outfit, sans-serif', fontSize: 14, fontWeight: 600,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            opacity: isNative || loading ? 0.35 : 1,
+            opacity: loading ? 0.6 : 1,
           }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill={isNative ? t.muted : 'white'}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
               <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
             </svg>
             Sign in with Apple

@@ -39,7 +39,7 @@ export default function AddSpotScreen({ onBack, onRequireAuth, userPos }) {
   const onPickCover = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert('Photo must be under 5 MB.'); return; }
+    if (file.size > 5 * 1024 * 1024) { setMsg('Photo must be under 5 MB.'); return; }
     if (blobRef.current) URL.revokeObjectURL(blobRef.current);
     blobRef.current = URL.createObjectURL(file);
     setCoverFile(file);

@@ -5,6 +5,9 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  signInWithCredential,
+  GoogleAuthProvider,
+  OAuthProvider,
   signOut,
   updateProfile,
   sendEmailVerification,
@@ -14,6 +17,8 @@ import {
   collection, where, getDocs, limit,
 } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
+import { SignInWithApple } from '@capacitor-community/apple-sign-in';
 
 const AuthContext = createContext(null);
 
@@ -21,6 +26,13 @@ export function AuthProvider({ children }) {
   const [user,        setUser]        = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loading,     setLoading]     = useState(true);
+
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      GoogleAuth.initialize({ scopes: ['profile', 'email'], grantOfflineAccess: false })
+        .catch(() => {});
+    }
+  }, []);
 
   const loadProfile = async (uid) => {
     try {
@@ -146,9 +158,11 @@ export function AuthProvider({ children }) {
     return cred;
   };
 
-  const signInGoogle = () => {
+  const signInGoogle = async () => {
     if (Capacitor.isNativePlatform()) {
-      return Promise.reject(Object.assign(new Error('Google sign-in is not supported in the mobile app yet — please use email and password.'), { code: 'auth/operation-not-supported-in-this-environment' }));
+      const googleUser = await GoogleAuth.signIn();
+      const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
+      return signInWithCredential(auth, credential);
     }
     return signInWithPopup(auth, googleProvider);
   };
@@ -194,14 +208,25 @@ export function AuthProvider({ children }) {
 
   const signInApple = async () => {
     if (Capacitor.isNativePlatform()) {
-      throw Object.assign(new Error('Apple sign-in is not supported in the mobile app yet — please use email and password.'), { code: 'auth/operation-not-supported-in-this-environment' });
+      const rawNonce = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map((b) => b.toString(16).padStart(2, '0')).join('');
+      const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(rawNonce));
+      const hashedNonce = Array.from(new Uint8Array(hashBuf))
+        .map((b) => b.toString(16).padStart(2, '0')).join('');
+      const { response } = await SignInWithApple.authorize({
+        clientId: 'com.egyspots.app',
+        redirectURI: 'https://egyspots-dc9c1.firebaseapp.com/__/auth/handler',
+        scopes: 'email name',
+        nonce: hashedNonce,
+      });
+      const provider = new OAuthProvider('apple.com');
+      const credential = provider.credential({ idToken: response.identityToken, rawNonce });
+      return signInWithCredential(auth, credential);
     }
-    const { OAuthProvider, signInWithPopup: signinPopup } = await import('firebase/auth');
     const provider = new OAuthProvider('apple.com');
     provider.addScope('email');
     provider.addScope('name');
-    const result = await signinPopup(auth, provider);
-    return result;
+    return signInWithPopup(auth, provider);
   };
 
   return (

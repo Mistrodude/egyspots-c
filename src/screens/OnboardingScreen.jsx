@@ -42,7 +42,7 @@ export default function OnboardingScreen({ onDone }) {
     }}>
 
       {/* Skip */}
-      <div style={{ padding: '56px 20px 0', display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{ padding: 'calc(env(safe-area-inset-top, 44px) + 12px) 20px 0', display: 'flex', justifyContent: 'flex-end' }}>
         <button onClick={onDone} style={{
           background: 'none', border: 'none', cursor: 'pointer',
           color: t.muted, fontSize: 13, fontFamily: 'Outfit, sans-serif', fontWeight: 600,

@@ -2,5 +2,11 @@
   "appId": "com.egyspots.app",
   "appName": "EgySpots",
   "webDir": "dist",
-  "bundledWebRuntime": false
+  "bundledWebRuntime": false,
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": ["profile", "email"],
+      "grantOfflineAccess": false
+    }
+  }
 }

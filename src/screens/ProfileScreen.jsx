@@ -51,14 +51,16 @@ export default function ProfileScreen({ onNavigateToAuth, onEditProfile, onSetti
 
   return (
     <div style={{ height: '100%', background: t.bg, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ borderBottom: `1px solid ${t.border}`, background: t.surface, position: 'relative' }}>
+      <div style={{ borderBottom: `1px solid ${t.border}`, background: t.surface }}>
         <div style={{ height: 'env(safe-area-inset-top, 44px)' }} />
         {onBack && (
-          <button onClick={onBack} style={{ position: 'absolute', top: 'env(safe-area-inset-top, 44px)', left: 14, border: 'none', background: 'transparent', cursor: 'pointer', padding: 4 }}>
-            <BackIcon color={t.text} size={20} />
-          </button>
+          <div style={{ padding: '8px 14px 0' }}>
+            <button onClick={onBack} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 4, display: 'flex' }}>
+              <BackIcon color={t.text} size={20} />
+            </button>
+          </div>
         )}
-        <div style={{ padding: '16px 14px 12px' }}>
+        <div style={{ padding: onBack ? '8px 14px 12px' : '16px 14px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {userProfile?.profilePhotoURL ? <img src={userProfile.profilePhotoURL} alt="profile" style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover' }} /> : <div style={{ width: 60, height: 60, borderRadius: '50%', background: t.accentBg, color: t.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 20 }}>{initials}</div>}
           <div style={{ flex: 1 }}>

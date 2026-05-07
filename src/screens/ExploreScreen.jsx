@@ -18,8 +18,9 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot, us
   const [locPing,      setLocPing]      = useState(false);
   const [userLocation, setUserLocation] = useState(null);
 
-  const handleRef = useRef(null);
-  const dragRef   = useRef(null);
+  const handleRef     = useRef(null);
+  const dragRef       = useRef(null);
+  const resetNorthRef = useRef(null);
 
   const filtered = useMemo(() => filterSpots(spots, category), [spots, category]);
 
@@ -105,11 +106,12 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot, us
           onSpotPress={handleSpotPress}
           checkedInId={checkedInId}
           flyToTarget={userLocation}
+          resetNorthRef={resetNorthRef}
         />
       </div>
 
       {/* Search bar */}
-      <div style={{ position: 'absolute', top: 62, left: 14, right: 14, zIndex: 1200 }}>
+      <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 44px) + 18px)', left: 14, right: 14, zIndex: 1200 }}>
         <button
           type="button"
           onClick={onOpenSearch}
@@ -148,7 +150,7 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot, us
           <LocateIcon color={locPing ? t.accent : t.muted} size={18} />
         </button>
 
-        <button style={{
+        <button onClick={() => resetNorthRef.current?.()} style={{
           width: 40, height: 40, borderRadius: '50%',
           border: `1px solid ${t.border}`, cursor: 'pointer',
           background: 'rgba(21,18,30,0.9)', backdropFilter: 'blur(12px)',

@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Camera, CameraSource, CameraResultType } from '@capacitor/camera';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useSpots } from '../context/SpotsContext';
@@ -24,19 +26,52 @@ export default function AddStoryScreen({ onClose, onRequireAuth, defaultSpotId, 
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
+  // Request camera + photo library permission on mount so dialog appears on first install
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      Camera.requestPermissions({ permissions: ['camera', 'photos'] }).catch(() => {});
+    }
+  }, []);
+
   if (!user) {
     onRequireAuth();
     return null;
   }
 
-  const handleFileChange = (e) => {
-    const f = e.target.files[0];
+  const applyFile = (f) => {
     if (!f) return;
     if (f.size > 5 * 1024 * 1024) { setError('Photo must be under 5 MB.'); return; }
     if (preview) URL.revokeObjectURL(preview);
     setPhoto(f);
     setPreview(URL.createObjectURL(f));
     setStep(2);
+  };
+
+  const handleFileChange = (e) => applyFile(e.target.files[0]);
+
+  const handleNativeCamera = async () => {
+    try {
+      const perms = await Camera.checkPermissions();
+      if (perms.camera === 'denied') {
+        setError('Camera access is blocked. Go to iOS Settings → EgySpots → Camera and enable it.');
+        return;
+      }
+      const result = await Camera.getPhoto({
+        quality: 80,
+        allowEditing: false,
+        resultType: CameraResultType.Uri,
+        source: CameraSource.Camera,
+      });
+      const response = await fetch(result.webPath);
+      const blob = await response.blob();
+      applyFile(new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' }));
+    } catch (e) {
+      const msg = e?.message?.toLowerCase() || '';
+      if (msg.includes('cancel') || msg.includes('dismiss')) return;
+      if (msg.includes('denied') || msg.includes('permission')) {
+        setError('Camera access is blocked. Go to iOS Settings → EgySpots → Camera and enable it.');
+      }
+    }
   };
 
   const handleSubmit = async () => {
@@ -119,7 +154,7 @@ export default function AddStoryScreen({ onClose, onRequireAuth, defaultSpotId, 
           <div style={{ fontSize: 15, fontWeight: 700, color: t.text }}>Add a photo to your story</div>
           <div style={{ display: 'flex', gap: 12 }}>
             <button
-              onClick={() => { fileRef.current.setAttribute('capture', 'environment'); fileRef.current.click(); }}
+              onClick={() => Capacitor.isNativePlatform() ? handleNativeCamera() : (fileRef.current.setAttribute('capture', 'environment'), fileRef.current.click())}
               style={{ padding: '12px 20px', borderRadius: 12, background: t.accent, color: 'white', border: 'none', cursor: 'pointer', fontFamily: 'Outfit, sans-serif', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
             >
               <CameraIcon color="white" size={16} /> Camera

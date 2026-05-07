@@ -82,7 +82,7 @@ export default function SettingsScreen({ onBack, onRequireAuth }) {
           <button onClick={() => window.open('https://egyspots-dc9c1.web.app/privacy.html', '_system')} style={toggle(t, false)}>Privacy Policy</button>
         </Card>
         <Card t={t} title="Support">
-          <button onClick={() => window.open('https://wa.me/201000000000', '_system')} style={toggle(t, false)}>Contact via WhatsApp</button>
+          <button onClick={() => window.open('https://wa.me/201099091378', '_system')} style={toggle(t, false)}>Contact via WhatsApp</button>
           <button onClick={() => window.open('mailto:support@egyspots.com', '_system')} style={toggle(t, false)}>Report a Bug</button>
         </Card>
         <Card t={t} title="Danger Zone">

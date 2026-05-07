@@ -29,6 +29,7 @@ export default function SpotDetailScreen({ spot, userPos, onBack, onOpenChat, on
   const [distWarn, setDistWarn] = useState(false);
   const [photoURLs, setPhotoURLs] = useState(spot.photoURLs || []);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoMsg, setPhotoMsg] = useState('');
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [userRating, setUserRating] = useState(null);
   const [hoverRating, setHoverRating] = useState(null);
@@ -137,7 +138,8 @@ export default function SpotDetailScreen({ spot, userPos, onBack, onOpenChat, on
   const uploadPhoto = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-    if (file.size > 5 * 1024 * 1024) { alert('Photo must be under 5 MB.'); return; }
+    if (file.size > 5 * 1024 * 1024) { setPhotoMsg('Photo must be under 5 MB.'); return; }
+    setPhotoMsg('');
     setUploadingPhoto(true);
     try {
       const sRef = ref(storage, `spots/${spot.id}/photos/${Date.now()}.jpg`);
@@ -276,6 +278,7 @@ export default function SpotDetailScreen({ spot, userPos, onBack, onOpenChat, on
               )}
               <input ref={photoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={uploadPhoto} />
             </div>
+            {photoMsg && <div style={{ fontSize: 12, color: t.error || '#ef4444', marginTop: 6 }}>{photoMsg}</div>}
           </div>
         )}
 

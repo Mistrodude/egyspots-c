@@ -10,7 +10,7 @@ function getTouchAngle(t1, t2) {
   return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX) * 180 / Math.PI;
 }
 
-export default function MapView({ spots, selectedId, onSpotPress, checkedInId, flyToTarget }) {
+export default function MapView({ spots, selectedId, onSpotPress, checkedInId, flyToTarget, resetNorthRef }) {
   const { isDark, t } = useTheme();
   const { storiesBySpot } = useStories();
   const containerRef = useRef(null);
@@ -175,6 +175,11 @@ export default function MapView({ spots, selectedId, onSpotPress, checkedInId, f
       containerRef.current.style.transform  = 'rotate(0deg)';
     }
   };
+
+  // Expose resetNorth to parent (ExploreScreen's compass button)
+  useEffect(() => {
+    if (resetNorthRef) resetNorthRef.current = resetNorth;
+  });
 
   const isRotated = Math.abs(bearing) > 3;
 

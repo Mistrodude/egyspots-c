@@ -1,60 +1,347 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Privacy Policy — EgySpots</title>
+  <title>Privacy Policy — Egyspots</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet" />
   <style>
-    body { font-family: 'Segoe UI', sans-serif; max-width: 720px; margin: 0 auto; padding: 32px 20px; color: #1a1a2e; line-height: 1.7; }
-    h1 { color: #A78BFA; } h2 { margin-top: 32px; }
-    a { color: #A78BFA; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0D0D0D;
+      color: #E5E5E5;
+      font-family: 'Outfit', sans-serif;
+      font-size: 16px;
+      line-height: 1.8;
+      padding: 0 0 80px 0;
+    }
+    header {
+      background: #111;
+      border-bottom: 1px solid #222;
+      padding: 20px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header a {
+      color: #F5C518;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 18px;
+    }
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 48px 24px;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: #F5C518;
+      margin-bottom: 8px;
+    }
+    .meta {
+      color: #888;
+      font-size: 14px;
+      margin-bottom: 48px;
+    }
+    h2 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #fff;
+      margin: 40px 0 12px 0;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #222;
+    }
+    p { margin-bottom: 16px; color: #CCC; }
+    ul { margin: 8px 0 16px 24px; color: #CCC; }
+    ul li { margin-bottom: 8px; }
+    a { color: #F5C518; }
+    .highlight {
+      background: #1A1A1A;
+      border-left: 3px solid #F5C518;
+      padding: 16px 20px;
+      border-radius: 0 8px 8px 0;
+      margin: 24px 0;
+    }
+    .highlight p { margin: 0; color: #E5E5E5; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 24px 0;
+      font-size: 14px;
+    }
+    th {
+      background: #1A1A1A;
+      color: #F5C518;
+      text-align: left;
+      padding: 12px;
+      border: 1px solid #333;
+    }
+    td {
+      padding: 12px;
+      border: 1px solid #222;
+      color: #CCC;
+      vertical-align: top;
+    }
+    footer {
+      text-align: center;
+      color: #555;
+      font-size: 13px;
+      margin-top: 64px;
+    }
+    footer a { color: #888; margin: 0 8px; }
   </style>
 </head>
 <body>
+
+<header>
+  <a href="/">← Egyspots</a>
+</header>
+
+<div class="container">
+
   <h1>Privacy Policy</h1>
-  <p><strong>EgySpots</strong> | Last updated: April 2026</p>
+  <p class="meta">Last updated: May 5, 2026 · Effective immediately upon account creation</p>
 
-  <h2>1. What We Collect</h2>
+  <div class="highlight">
+    <p>Your privacy matters to us. This policy explains exactly what data we collect, why we collect it, how we use it, and your rights over it. We will never sell your personal data to third parties.</p>
+  </div>
+
+  <!-- 1 -->
+  <h2>1. Who We Are</h2>
+  <p>Egyspots is a mobile application operated in the Arab Republic of Egypt. We are the data controller for personal data collected through the Egyspots app and website (egyspots.com).</p>
+  <p>Data Protection Contact: <a href="mailto:privacy@egyspots.com">privacy@egyspots.com</a></p>
+
+  <!-- 2 -->
+  <h2>2. Data We Collect</h2>
+  <p>We collect the following categories of personal data:</p>
+
+  <table>
+    <tr>
+      <th>Category</th>
+      <th>Data</th>
+      <th>Why We Collect It</th>
+    </tr>
+    <tr>
+      <td><strong>Account Data</strong></td>
+      <td>Full name, username, email address, phone number (optional), date of birth, gender</td>
+      <td>To create and manage your account; to enforce age restrictions</td>
+    </tr>
+    <tr>
+      <td><strong>Profile Data</strong></td>
+      <td>Profile photo, bio, city</td>
+      <td>To display your public profile within the app</td>
+    </tr>
+    <tr>
+      <td><strong>Location Data</strong></td>
+      <td>GPS coordinates when using the app; location at time of check-in or story post</td>
+      <td>To show nearby spots; to verify check-in and story proximity</td>
+    </tr>
+    <tr>
+      <td><strong>Content Data</strong></td>
+      <td>Photos, captions, check-in notes, ratings, spot descriptions</td>
+      <td>To enable core app features; to display on the platform</td>
+    </tr>
+    <tr>
+      <td><strong>Usage Data</strong></td>
+      <td>App opens, screens visited, features used, check-in history</td>
+      <td>To improve the app and understand how it is used</td>
+    </tr>
+    <tr>
+      <td><strong>Device Data</strong></td>
+      <td>Device type, operating system version, app version, language settings</td>
+      <td>To ensure compatibility and debug technical issues</td>
+    </tr>
+    <tr>
+      <td><strong>Authentication Data</strong></td>
+      <td>Login method (email/Google/Apple); authentication tokens</td>
+      <td>To authenticate your identity securely</td>
+    </tr>
+  </table>
+
+  <p><strong>We do NOT collect:</strong> payment information, national ID, passport data, precise home address, or any financial information.</p>
+
+  <!-- 3 -->
+  <h2>3. How We Use Your Data</h2>
+  <p>We use your personal data only for these purposes:</p>
   <ul>
-    <li>Account info: email address, display name, username, phone number, date of birth, gender, city</li>
-    <li>Location data: GPS coordinates when you use check-in or locate features (only while using the app)</li>
-    <li>User-generated content: photos you upload as stories, spot descriptions you write</li>
-    <li>Usage data: check-ins, story views, app interactions (via Firebase Analytics)</li>
+    <li>Creating and managing your account</li>
+    <li>Displaying nearby spots and heatmaps on the map</li>
+    <li>Enabling check-ins, stories, ratings, and spot creation</li>
+    <li>Sending in-app notifications about spots you follow</li>
+    <li>Enforcing our Terms of Service and age restrictions</li>
+    <li>Improving app performance and fixing bugs</li>
+    <li>Complying with Egyptian law and legal obligations</li>
+    <li>Responding to support requests</li>
+  </ul>
+  <p>We do <strong>not</strong> use your data for:</p>
+  <ul>
+    <li>Selling to third parties</li>
+    <li>Targeted advertising based on personal profiles</li>
+    <li>Automated decision-making that significantly affects you</li>
+    <li>Any purpose not listed above</li>
   </ul>
 
-  <h2>2. How We Use Your Data</h2>
+  <!-- 4 -->
+  <h2>4. Location Data — Specific Practices</h2>
+  <p>Location is central to how Egyspots works. Here is exactly how we handle it:</p>
   <ul>
-    <li>To show you nearby hangout spots on the map</li>
-    <li>To enable check-ins, stories, and community features</li>
-    <li>To send in-app notifications about spot activity</li>
-    <li>To enforce our age gate (13+) and Terms of Service</li>
+    <li><strong>When we access location:</strong> Only while you are actively using the app (foreground only). We do not track your location in the background.</li>
+    <li><strong>What we show publicly:</strong> Only anonymized, aggregated heatmap density. We never show your individual precise location to other users.</li>
+    <li><strong>Check-in location:</strong> We record your approximate location at time of check-in to verify you are near the spot. This is stored in our database but not displayed publicly with your identity.</li>
+    <li><strong>Story location:</strong> We verify you are within 300 metres of a spot before allowing you to post a story. The precise coordinates are not published.</li>
+    <li><strong>How to disable:</strong> Go to your device Settings → Privacy → Location Services → Egyspots → set to Never. Note: disabling location prevents check-ins and nearby discovery from working.</li>
   </ul>
 
-  <h2>3. Data Retention</h2>
+  <!-- 5 -->
+  <h2>5. Photos and User Content</h2>
   <ul>
-    <li>Stories are automatically deleted after 6 hours via Firestore TTL policy</li>
-    <li>Account data is retained until you delete your account</li>
-    <li>Check-in history is deleted when you delete your account</li>
+    <li>Photos you upload are stored on Google Firebase Storage servers.</li>
+    <li>Story photos are automatically deleted after 6 hours.</li>
+    <li>Profile photos and spot photos remain until you delete them or delete your account.</li>
+    <li>We do not scan or analyse your photos for advertising purposes.</li>
+    <li>We may use automated tools to detect illegal or prohibited content (e.g. Google Vision SafeSearch). Flagged content is reviewed by our moderation team, not used for any other purpose.</li>
   </ul>
 
-  <h2>4. Third Parties</h2>
+  <!-- 6 -->
+  <h2>6. Data Sharing</h2>
+  <p>We share your data only in these limited circumstances:</p>
+
+  <table>
+    <tr>
+      <th>Recipient</th>
+      <th>What We Share</th>
+      <th>Why</th>
+    </tr>
+    <tr>
+      <td><strong>Google Firebase</strong></td>
+      <td>All app data (stored on Firebase infrastructure)</td>
+      <td>Our backend infrastructure provider</td>
+    </tr>
+    <tr>
+      <td><strong>Google Sign-In</strong></td>
+      <td>Name and email (if you use Google login)</td>
+      <td>Authentication only</td>
+    </tr>
+    <tr>
+      <td><strong>Apple Sign-In</strong></td>
+      <td>Name and email (if you use Apple login)</td>
+      <td>Authentication only</td>
+    </tr>
+    <tr>
+      <td><strong>Egyptian Authorities</strong></td>
+      <td>Data required by law</td>
+      <td>Legal compliance only, when required by valid legal process</td>
+    </tr>
+  </table>
+
+  <p>We do <strong>not</strong> share your data with advertisers, data brokers, marketing companies, or any other third parties.</p>
+
+  <!-- 7 -->
+  <h2>7. Data Storage and Security</h2>
+  <p>Your data is stored on Google Firebase servers. Firebase is certified to ISO 27001, SOC 1, SOC 2, and SOC 3 security standards.</p>
+  <p>We protect your data through:</p>
   <ul>
-    <li><strong>Firebase (Google)</strong> — database, authentication, storage, analytics</li>
-    <li><strong>OpenStreetMap / CARTO</strong> — map tiles (no personal data shared)</li>
-    <li><strong>Apple / Google</strong> — if you use Sign in with Apple or Google</li>
+    <li>HTTPS encryption for all data in transit</li>
+    <li>Firebase Security Rules restricting data access by user identity</li>
+    <li>No storage of passwords (handled by Firebase Authentication)</li>
+    <li>Restricted admin access to production data</li>
   </ul>
-  <p>We do not sell your data. We do not share it with advertisers.</p>
+  <p>While we take reasonable precautions, no system is completely secure. In the event of a data breach affecting your personal data, we will notify you within 72 hours as required by Egyptian Law 151 of 2020.</p>
 
-  <h2>5. Your Rights</h2>
-  <p>You may request access to, correction of, or deletion of your personal data at any time. To delete your account and all associated data, use <strong>Settings → Delete Account</strong> inside the app, or email us at <a href="mailto:privacy@egyspots.com">privacy@egyspots.com</a>.</p>
+  <!-- 8 -->
+  <h2>8. Data Retention</h2>
+  <table>
+    <tr>
+      <th>Data Type</th>
+      <th>Retention Period</th>
+    </tr>
+    <tr>
+      <td>Stories (photos + captions)</td>
+      <td>Automatically deleted after 6 hours</td>
+    </tr>
+    <tr>
+      <td>Account data</td>
+      <td>Until account deletion, then within 30 days</td>
+    </tr>
+    <tr>
+      <td>Check-in history</td>
+      <td>Until account deletion</td>
+    </tr>
+    <tr>
+      <td>Spot data (founder)</td>
+      <td>Spot remains after account deletion; founder name replaced with "Deleted User"</td>
+    </tr>
+    <tr>
+      <td>Usage logs</td>
+      <td>90 days</td>
+    </tr>
+    <tr>
+      <td>Legal hold data</td>
+      <td>As required by Egyptian law</td>
+    </tr>
+  </table>
 
-  <h2>6. Children</h2>
-  <p>EgySpots is not intended for children under the age of 13. We do not knowingly collect data from children under 13. If you believe a child has provided us with personal information, please contact us immediately.</p>
+  <!-- 9 -->
+  <h2>9. Your Rights (Egyptian Law 151 of 2020)</h2>
+  <p>Under Egyptian Law 151 of 2020 (Personal Data Protection Law), you have the following rights:</p>
+  <ul>
+    <li><strong>Right to Access:</strong> Request a copy of all personal data we hold about you</li>
+    <li><strong>Right to Correction:</strong> Request correction of inaccurate data</li>
+    <li><strong>Right to Deletion:</strong> Request deletion of your personal data (subject to legal retention requirements)</li>
+    <li><strong>Right to Restrict Processing:</strong> Request that we limit how we use your data</li>
+    <li><strong>Right to Object:</strong> Object to certain uses of your data</li>
+    <li><strong>Right to Data Portability:</strong> Request your data in a machine-readable format</li>
+    <li><strong>Right to Withdraw Consent:</strong> Withdraw consent at any time where processing is based on consent</li>
+  </ul>
+  <p>To exercise any of these rights, email <a href="mailto:privacy@egyspots.com">privacy@egyspots.com</a>. We will respond within 30 days. You may also delete your account directly in the app: Profile → Settings → Delete Account.</p>
 
-  <h2>7. Egypt Law 151 of 2020</h2>
-  <p>EgySpots processes personal data in compliance with Egyptian Law No. 151 of 2020 on the Protection of Personal Data. Data is processed on a lawful basis, limited to stated purposes, and protected by appropriate technical measures.</p>
+  <!-- 10 -->
+  <h2>10. Children's Privacy</h2>
+  <p>Egyspots is not intended for children under 13. We do not knowingly collect personal data from children under 13. If you believe a child under 13 has created an account, please contact us at <a href="mailto:privacy@egyspots.com">privacy@egyspots.com</a> and we will delete the account and associated data immediately.</p>
+  <p>Users between 13 and 18 are considered minors in Egypt. We recommend parental involvement in account creation for users under 18.</p>
 
-  <h2>8. Contact</h2>
-  <p>Email: <a href="mailto:privacy@egyspots.com">privacy@egyspots.com</a></p>
+  <!-- 11 -->
+  <h2>11. Cross-Border Data Transfers</h2>
+  <p>Your data is stored on Google Firebase servers which may be located outside Egypt. By using Egyspots, you consent to this transfer. Google maintains appropriate safeguards for international data transfers in compliance with applicable privacy laws.</p>
+
+  <!-- 12 -->
+  <h2>12. Cookies and Tracking</h2>
+  <p>The Egyspots mobile app does not use advertising cookies or cross-app tracking. We use Firebase Analytics to understand app usage in aggregate — this data is anonymized and not linked to your identity for advertising purposes.</p>
+  <p>Our website (egyspots.com) uses Google Fonts which may set cookies from Google's servers. No advertising cookies are used on our website.</p>
+  <p>We do <strong>not</strong> track you across other apps or websites. We do not use your data for retargeted advertising.</p>
+
+  <!-- 13 -->
+  <h2>13. Anonymized and Aggregate Data</h2>
+  <p>We may use and share anonymized, aggregate data that cannot identify any individual — for example, "1,200 check-ins happened in New Cairo last Friday" — for platform analytics, research, and potential partnerships. This data contains no personal information and is not subject to this Privacy Policy.</p>
+
+  <!-- 14 -->
+  <h2>14. Third-Party Links</h2>
+  <p>The app may contain links to external services (such as Google Maps for directions). These third-party services have their own privacy policies. We are not responsible for their privacy practices.</p>
+
+  <!-- 15 -->
+  <h2>15. Changes to This Policy</h2>
+  <p>We may update this Privacy Policy from time to time. We will notify you of material changes via in-app notification or email. The "Last updated" date at the top of this page will always reflect the most recent version. Continued use of Egyspots after changes constitutes acceptance of the updated policy.</p>
+
+  <!-- 16 -->
+  <h2>16. Contact and Complaints</h2>
+  <p>For privacy questions or to exercise your rights:</p>
+  <ul>
+    <li>Email: <a href="mailto:privacy@egyspots.com">privacy@egyspots.com</a></li>
+    <li>General support: <a href="mailto:support@egyspots.com">support@egyspots.com</a></li>
+  </ul>
+  <p>If you believe we have not handled your data correctly, you have the right to lodge a complaint with the Egyptian Personal Data Protection Center (PDPC) once it is fully operational under Law 151 of 2020.</p>
+
+  <footer>
+    <p>© 2026 Egyspots. All rights reserved.</p>
+    <p style="margin-top:8px;">
+      <a href="/privacy.html">Privacy Policy</a>
+      <a href="/terms.html">Terms of Service</a>
+      <a href="mailto:support@egyspots.com">Contact</a>
+    </p>
+  </footer>
+
+</div>
 </body>
 </html>

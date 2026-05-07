@@ -26,33 +26,21 @@ export function SpotsProvider({ children }) {
   useEffect(() => { spotsRef.current = spots; },          [spots]);
   useEffect(() => { checkinHistoryRef.current = checkinHistory; }, [checkinHistory]);
 
-  // Seed or migrate spot documents (requires auth — rules block unauthenticated writes)
+  // Seed spot documents on first deploy only
   useEffect(() => {
-    if (!user) return;
+    if (!user || localStorage.getItem('spots_seeded')) return;
     const syncSeeds = async () => {
       try {
         const snap = await getDocs(collection(db, 'spots'));
-        const batch = writeBatch(db);
         if (snap.empty) {
+          const batch = writeBatch(db);
           SPOTS_SEED.forEach((s) => {
             batch.set(doc(db, 'spots', s.id), { ...s, createdAt: serverTimestamp() });
           });
-        } else {
-          // Back-fill description / operatingHours on seed docs that predate those fields
-          snap.docs.forEach((d) => {
-            const data = d.data();
-            const seed = SPOTS_SEED.find((s) => s.id === d.id);
-            if (!seed) return;
-            const update = {};
-            if (!data.description && seed.description) update.description = seed.description;
-            if (!data.operatingHours && seed.operatingHours) update.operatingHours = seed.operatingHours;
-            if (Object.keys(update).length > 0) batch.update(d.ref, update);
-          });
+          await batch.commit();
         }
-        await batch.commit();
-      } catch (e) {
-        console.warn('Firestore sync:', e.message);
-      }
+        localStorage.setItem('spots_seeded', '1');
+      } catch (_) {}
     };
     syncSeeds();
   }, [user]);
@@ -148,7 +136,7 @@ export function SpotsProvider({ children }) {
           userPhotoURL: userProfile?.profilePhotoURL || user.photoURL || null,
           spotId,
           spotName:    spot?.name || '',
-          ownerId:     spot?.ownerId || null,
+          founderId:   spot?.founderId || null,
           note:        options.note || '',
           photoURL:    options.photoURL || null,
           rating:      options.rating || null,
