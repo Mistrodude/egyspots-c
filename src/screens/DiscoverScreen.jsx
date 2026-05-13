@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { db } from '../firebase';
 import { useTheme } from '../context/ThemeContext';
 import { useSpots } from '../context/SpotsContext';
 import { SearchIcon, StarIcon } from '../components/Icons';
@@ -21,6 +23,13 @@ export default function DiscoverScreen({ onSpotPress, onOpenSearch }) {
   const { t } = useTheme();
   const { spots, checkinHistory } = useSpots();
   const [category, setCategory] = useState('All');
+  const [leaderboard, setLeaderboard] = useState([]);
+
+  useEffect(() => {
+    getDocs(query(collection(db, 'users'), orderBy('points', 'desc'), limit(10)))
+      .then((snap) => setLeaderboard(snap.docs.map((d) => ({ uid: d.id, ...d.data() }))))
+      .catch(() => {});
+  }, []);
 
   const categoryFiltered = useMemo(() => filterSpots(spots, category), [spots, category]);
   const visited = useMemo(() => new Set((checkinHistory || []).map((c) => c.spotId)), [checkinHistory]);
@@ -52,6 +61,35 @@ export default function DiscoverScreen({ onSpotPress, onOpenSearch }) {
         <SearchIcon color={t.muted} size={16} />
         Search spots, food, vibes...
       </button>
+
+      <Section t={t} title="Top Explorers" subtitle="Most points">
+        {leaderboard.length === 0 ? (
+          <div style={{ border: `1px solid ${t.border}`, background: t.surface, borderRadius: 12, padding: 14, color: t.muted, fontSize: 12, textAlign: 'center' }}>
+            No explorers yet — be the first to check in!
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {leaderboard.map((u, i) => (
+              <div key={u.uid} style={{ display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${t.border}`, background: t.surface, borderRadius: 12, padding: '10px 12px' }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: i < 3 ? t.accent : t.muted, width: 22, textAlign: 'center' }}>
+                  {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
+                </div>
+                {u.profilePhotoURL
+                  ? <img src={u.profilePhotoURL} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+                  : <div style={{ width: 32, height: 32, borderRadius: '50%', background: t.accentBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: t.accent }}>
+                      {(u.displayName || u.username || '?')[0].toUpperCase()}
+                    </div>
+                }
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: t.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.displayName || u.username || 'Explorer'}</div>
+                  <div style={{ fontSize: 10, color: t.muted }}>{u.totalCheckins || 0} check-ins</div>
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: t.accent }}>{u.points || 0}<span style={{ fontSize: 10, fontWeight: 500, color: t.muted }}> pts</span></div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
 
       <Section t={t} title="Trending This Week" subtitle="Most weekly check-ins">
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>

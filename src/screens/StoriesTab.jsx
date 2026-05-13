@@ -42,7 +42,32 @@ export default function StoriesTab({ onSpotPress, onAddStory, onRequireAuth }) {
       </div>
 
       {loading ? (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: t.muted, fontSize: 13 }}>Loading…</div>
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {/* Skeleton rings */}
+          <div style={{ padding: '14px 12px 12px', borderBottom: `1px solid ${t.border}` }}>
+            <div style={{ width: 80, height: 9, borderRadius: 4, background: t.border, marginBottom: 12 }} className="shimmer" />
+            <div style={{ display: 'flex', gap: 14 }}>
+              {[...Array(5)].map((_, i) => (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
+                  <div className="shimmer" style={{ width: 58, height: 58, borderRadius: '50%', background: t.border }} />
+                  <div className="shimmer" style={{ width: 44, height: 7, borderRadius: 4, background: t.border }} />
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Skeleton grid */}
+          <div style={{ padding: '14px 12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="shimmer" style={{ borderRadius: 14, overflow: 'hidden', background: t.surface }}>
+                <div style={{ width: '100%', height: 90, background: t.border }} />
+                <div style={{ padding: '8px 10px' }}>
+                  <div style={{ width: '65%', height: 9, borderRadius: 4, background: t.border, marginBottom: 7 }} />
+                  <div style={{ width: '38%', height: 7, borderRadius: 4, background: t.border }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       ) : spotsWithStories.length === 0 ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
           <div style={{ fontSize: 36 }}>📍</div>

@@ -6,9 +6,28 @@ import { useAuth } from '../context/AuthContext';
 import { useSpots } from '../context/SpotsContext';
 import { storage, db } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { addDoc, collection, Timestamp } from 'firebase/firestore';
+import { addDoc, collection, Timestamp, updateDoc, doc, increment } from 'firebase/firestore';
+import { computeStoryPoints } from '../utils/points';
 import { XIcon, CameraIcon } from '../components/Icons';
 import { haversineMeters, STORY_RADIUS_M } from '../utils/geo';
+
+function compressImage(blob, maxWidth = 1280, quality = 0.75) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxWidth / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((b) => resolve(b || blob), 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(blob); };
+    img.src = url;
+  });
+}
 
 export default function AddStoryScreen({ onClose, onRequireAuth, defaultSpotId, userPos }) {
   const { t } = useTheme();
@@ -17,14 +36,15 @@ export default function AddStoryScreen({ onClose, onRequireAuth, defaultSpotId, 
   const fileRef = useRef(null);
 
   const [step,       setStep]       = useState(1); // 1: pick photo, 2: spot+caption, 3: submit
-  const [photo,      setPhoto]      = useState(null);
+  const [photo,      setPhoto]      = useState(null); // File from gallery
+  const [nativePath, setNativePath] = useState(null); // webPath from Capacitor Camera
   const [preview,    setPreview]    = useState('');
   const [spotId,     setSpotId]     = useState(defaultSpotId || '');
   const [caption,    setCaption]    = useState('');
   const [loading,    setLoading]    = useState(false);
   const [error,      setError]      = useState('');
 
-  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+  useEffect(() => () => { if (preview && preview.startsWith('blob:')) URL.revokeObjectURL(preview); }, [preview]);
 
   // Request camera + photo library permission on mount so dialog appears on first install
   useEffect(() => {
@@ -40,9 +60,10 @@ export default function AddStoryScreen({ onClose, onRequireAuth, defaultSpotId, 
 
   const applyFile = (f) => {
     if (!f) return;
-    if (f.size > 5 * 1024 * 1024) { setError('Photo must be under 5 MB.'); return; }
-    if (preview) URL.revokeObjectURL(preview);
+    if (f.size > 30 * 1024 * 1024) { setError('Photo must be under 30 MB.'); return; }
+    if (preview && preview.startsWith('blob:')) URL.revokeObjectURL(preview);
     setPhoto(f);
+    setNativePath(null);
     setPreview(URL.createObjectURL(f));
     setStep(2);
   };
@@ -51,20 +72,18 @@ export default function AddStoryScreen({ onClose, onRequireAuth, defaultSpotId, 
 
   const handleNativeCamera = async () => {
     try {
-      const perms = await Camera.checkPermissions();
-      if (perms.camera === 'denied') {
-        setError('Camera access is blocked. Go to iOS Settings → EgySpots → Camera and enable it.');
-        return;
-      }
       const result = await Camera.getPhoto({
-        quality: 80,
+        quality: 70,
         allowEditing: false,
         resultType: CameraResultType.Uri,
         source: CameraSource.Camera,
       });
-      const response = await fetch(result.webPath);
-      const blob = await response.blob();
-      applyFile(new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' }));
+      // Show preview immediately without fetching — fetch + compress happens at upload time
+      if (preview && preview.startsWith('blob:')) URL.revokeObjectURL(preview);
+      setPhoto(null);
+      setNativePath(result.webPath);
+      setPreview(result.webPath);
+      setStep(2);
     } catch (e) {
       const msg = e?.message?.toLowerCase() || '';
       if (msg.includes('cancel') || msg.includes('dismiss')) return;
@@ -75,7 +94,8 @@ export default function AddStoryScreen({ onClose, onRequireAuth, defaultSpotId, 
   };
 
   const handleSubmit = async () => {
-    if (!photo || !spotId) { setError('Please select a photo and a spot.'); return; }
+    if (!photo && !nativePath) { setError('Please select a photo.'); return; }
+    if (!spotId) { setError('Please select a spot.'); return; }
     if (userPos && spot) {
       const dist = haversineMeters(userPos, spot);
       if (dist > STORY_RADIUS_M) {
@@ -86,9 +106,22 @@ export default function AddStoryScreen({ onClose, onRequireAuth, defaultSpotId, 
     setLoading(true);
     setError('');
     try {
+      // Resolve blob: fetch native temp file or use File from gallery directly
+      let rawBlob = photo;
+      if (nativePath) {
+        const r = await fetch(nativePath);
+        rawBlob = await r.blob();
+      }
+      // Compress to ≤1280px wide, 75% JPEG — typically reduces 3 MB → ~250 KB
+      const compressed = await compressImage(rawBlob);
+
       const storyId = `${user.uid}_${Date.now()}`;
       const storageRef = ref(storage, `stories/${spotId}/${storyId}.jpg`);
-      await uploadBytes(storageRef, photo, { customMetadata: { uploadedBy: user.uid } });
+      const uploadPromise = uploadBytes(storageRef, compressed, { customMetadata: { uploadedBy: user.uid } });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 30000)
+      );
+      await Promise.race([uploadPromise, timeoutPromise]);
       const photoURL = await getDownloadURL(storageRef);
 
       const now = Timestamp.now();
@@ -107,6 +140,12 @@ export default function AddStoryScreen({ onClose, onRequireAuth, defaultSpotId, 
         viewedBy:     [],
       });
 
+      // Award story points — fire-and-forget
+      const storyPts = computeStoryPoints({ userId: user.uid, founderId: spot?.founderId || null });
+      Object.entries(storyPts).forEach(([uid, pts]) => {
+        updateDoc(doc(db, 'users', uid), { points: increment(pts) }).catch(() => {});
+      });
+
       // Notify spot founder (fire-and-forget)
       if (spot?.founderId && spot.founderId !== user.uid) {
         addDoc(collection(db, 'notifications'), {
@@ -122,7 +161,9 @@ export default function AddStoryScreen({ onClose, onRequireAuth, defaultSpotId, 
 
       onClose();
     } catch (e) {
-      setError('Failed to post story. Try again.');
+      setError(e?.message === 'timeout'
+        ? 'Upload timed out — check your connection and try again.'
+        : 'Failed to post story. Try again.');
       setLoading(false);
     }
   };
@@ -176,7 +217,7 @@ export default function AddStoryScreen({ onClose, onRequireAuth, defaultSpotId, 
           <div style={{ position: 'relative' }}>
             <img src={preview} alt="preview" style={{ width: '100%', borderRadius: 14, maxHeight: 280, objectFit: 'cover' }} />
             <button
-              onClick={() => { setPhoto(null); setPreview(''); setStep(1); }}
+              onClick={() => { setPhoto(null); setNativePath(null); setPreview(''); setStep(1); }}
               style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
               <XIcon color="white" size={14} />

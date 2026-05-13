@@ -33,12 +33,15 @@ export default function BottomNav({ tab, setTab, onStoryFABPress, nearbySpot, ch
     }}>
       {/* Map + Explore tabs */}
       {TABS.slice(0, 2).map(({ id, Icon, label }) => (
-        <TabButton key={id} id={id} Icon={Icon} label={label} active={tab === id} setTab={setTab} t={t} />
+        <TabButton key={id} id={id} Icon={Icon} label={label} active={tab === id} setTab={setTab} t={t}
+          tourId={id === 'explore' ? 'tour-explore' : undefined}
+        />
       ))}
 
       {/* Center FAB — Here (purple) when checked in, Check In (green) when near, Story (purple) otherwise */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', paddingBottom: 2 }}>
         <button
+          id="tour-fab"
           onClick={onStoryFABPress}
           aria-label={isCheckedInHere ? `Leave ${nearbySpot.name}` : isNearSpot ? `Check in to ${nearbySpot.name}` : 'Post a story'}
           style={{
@@ -85,6 +88,7 @@ export default function BottomNav({ tab, setTab, onStoryFABPress, nearbySpot, ch
         <TabButton
           key={id} id={id} Icon={Icon} label={label}
           active={tab === id} setTab={setTab} t={t}
+          tourId={id === 'stories' ? 'tour-stories' : undefined}
           badge={
             id === 'stories' && unviewedCount > 0 ? unviewedCount
             : id === 'profile' && unreadCount > 0 ? unreadCount
@@ -96,9 +100,10 @@ export default function BottomNav({ tab, setTab, onStoryFABPress, nearbySpot, ch
   );
 }
 
-function TabButton({ id, Icon, label, active, setTab, t, badge = 0 }) {
+function TabButton({ id, Icon, label, active, setTab, t, badge = 0, tourId }) {
   return (
     <button
+      id={tourId}
       onClick={() => setTab(id)}
       style={{
         flex: 1, padding: '10px 0 7px',

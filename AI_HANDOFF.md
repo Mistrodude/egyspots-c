@@ -1,6 +1,6 @@
 # AI Handoff — EgySpots (Read This First, Every Session)
 
-Last updated: 2026-05-07 (session 14)
+Last updated: 2026-05-13 (session 18)
 
 ---
 
@@ -78,7 +78,8 @@ egyspots-c/
 │   │
 │   ├── utils/
 │   │   ├── geo.js                   # haversineMeters(a,b), CHECKIN_RADIUS_M=200, STORY_RADIUS_M=300, MIN_SPOT_DISTANCE_M=300
-│   │   └── openStatus.js            # getOpenStatus(operatingHours) → {isOpen, label} | null; DEFAULT_HOURS()
+│   │   ├── openStatus.js            # getOpenStatus(operatingHours) → {isOpen, label} | null; DEFAULT_HOURS()
+│   │   └── points.js                # Two-track points system — pure functions; single source of truth for point constants
 │   │
 │   ├── screens/
 │   │   ├── ExploreScreen.jsx        # Map tab — Leaflet map + draggable bottom sheet + category pills
@@ -118,7 +119,8 @@ egyspots-c/
 │       ├── SpotCard.test.jsx
 │       ├── AuthScreen.test.jsx
 │       ├── SpotsContext.test.jsx
-│       └── StoriesContext.test.jsx
+│       ├── StoriesContext.test.jsx
+│       └── points.test.js           # 19 tests covering explorerCheckinPts, isMilestone, shouldAwardFounder, computeCheckinPoints, computeStoryPoints
 │
 ├── functions/
 │   ├── src/index.ts                 # deleteUserData Cloud Function (v2 onCall)
@@ -239,6 +241,38 @@ User's existing rating is loaded on mount. Changing rating correctly updates the
 
 ---
 
+## Points System (Two-Track)
+
+All point constants and pure logic live in `src/utils/points.js` — no Firestore imports there, fully testable.
+
+### Constants
+| Constant | Value | Description |
+|---|---|---|
+| `EXPLORER_FIRST_VISIT` | 10 | Explorer checks into a spot for the first time |
+| `EXPLORER_REPEAT_VISIT` | 2 | Explorer revisits a spot they've been to before |
+| `EXPLORER_POST_STORY` | 5 | Explorer posts a story at any spot |
+| `EXPLORER_FIRST_SPOT_CHECKIN` | 20 | Awarded to founder when their spot receives its very first check-in |
+| `FOUNDER_CHECKIN` | 5 | Founder earns when another user checks in at their spot |
+| `FOUNDER_STORY` | 3 | Founder earns when another user posts a story at their spot |
+| `FOUNDER_MILESTONE` | 50 | Bonus to founder when spot hits exactly 10, 50, or 100 total check-ins |
+| `MILESTONE_THRESHOLDS` | [10, 50, 100] | The exact total-check-in counts that trigger the milestone bonus |
+
+### Rules
+- Founder points are NEVER self-awarded (`shouldAwardFounder` returns false when `founderId === actingUserId`)
+- Milestone bonus fires regardless of who triggers it (even self-checkin at milestone)
+- All points written to `users/{uid}.points` via Firestore `increment()` — fire-and-forget so they never block check-in or story UX
+- First-visit detection: `getDocs(query(checkins, where userId==user.uid, where spotId==spotId, limit(1)))` before writing the new checkin doc
+
+### Where points are awarded
+- **Check-in**: `SpotsContext.checkIn()` in the non-leaving path — after the checkin doc is written, before `updateDoc` returns
+- **Story post**: `AddStoryScreen.handleSubmit()` — after `addDoc(stories, ...)` succeeds, before `onClose()`
+
+### UI
+- **ProfileScreen stats row**: 4 stats — Check-ins | Founded | Stories | Points (grid 4 columns)
+- **DiscoverScreen leaderboard**: "Top Explorers" section — Firestore query `orderBy('points', 'desc'), limit(10)` on mount; renders medal emoji for top 3, `#N` for rest
+
+---
+
 ## Check-in Spam Guard
 
 `SpotsContext.checkIn()` — before any optimistic update:
@@ -312,6 +346,7 @@ export const auth = initializeAuth(app, { persistence: browserLocalPersistence }
 { uid, email, displayName, username, profilePhotoURL, bio, city,
   role: 'user', totalCheckins, activeCheckin, savedSpots: [],
   notifSettings: { newSpots, checkIns, stories, systemAlerts },
+  points,   // combined Explorer + Founder points; updated via Firestore increment()
   createdAt }
 ```
 
@@ -439,15 +474,18 @@ Mac IP: `ipconfig getifaddr en0` (Wi-Fi) or `en1`.
 
 ---
 
-## Pending Deployment Steps (manual — not done yet)
+## Deployment Status — ALL DONE ✅
 
-1. ~~**Enable Apple Sign-in**~~ ✅ Done 2026-05-06 — Firebase Console → Auth → Sign-in providers
+1. ~~**Enable Apple Sign-in**~~ ✅ Done 2026-05-06
 2. ~~**Deploy Firestore rules**~~ ✅ Done 2026-05-01
-3. ~~**Deploy Storage rules**~~ ✅ Done 2026-05-06 — `firebase deploy --only storage` succeeded
-4. ~~**Deploy Cloud Functions**~~ ✅ Done 2026-05-06 — `firebase deploy --only functions`
-5. ~~**Set Firestore TTL**~~ ✅ Done 2026-05-06 — `stories.expiresAt` TTL policy set in Firebase Console
-6. ~~**Deploy hosting**~~ ✅ Done 2026-05-06 — `firebase deploy --only hosting`
-7. ~~**Re-register iOS app in Firebase**~~ ✅ Done 2026-05-06 — new `GoogleService-Info.plist` downloaded and replaced in `ios/App/App/`
+3. ~~**Deploy Storage rules**~~ ✅ Done 2026-05-06
+4. ~~**Deploy Cloud Functions**~~ ✅ Done 2026-05-06
+5. ~~**Set Firestore TTL**~~ ✅ Done 2026-05-06
+6. ~~**Deploy hosting**~~ ✅ Done 2026-05-06
+7. ~~**Re-register iOS app in Firebase**~~ ✅ Done 2026-05-06
+8. ~~**App Store Connect listing**~~ ✅ Done 2026-05-07 — description, keywords, screenshots, age rating, export compliance
+9. ~~**Demo reviewer account**~~ ✅ Done 2026-05-07
+10. ~~**App Store approval**~~ ✅ Done 2026-05-07 — **app is LIVE** at `https://apps.apple.com/us/app/egyspots/id6766826786`
 
 **Xcode**: always **Cmd+Shift+K** (clean build) after `npm run build && npx cap sync ios`.
 
@@ -464,7 +502,7 @@ Mac IP: `ipconfig getifaddr en0` (Wi-Fi) or `en1`.
 
 Run `npm test` **from your own terminal** (not through Claude Code — its bash sandbox blocks inter-process communication that Vitest requires for worker threads).
 
-**Result:** 49/49 tests pass across 6 files (as of 2026-05-01, session 9).
+**Result:** 68/68 tests pass across 7 files (49 original + 19 new points tests added in session 17).
 
 **Test environment:** Node.js v24.4.1 + Vitest 3.2.4.
 
@@ -498,6 +536,135 @@ MIN_SPOT_DISTANCE_M = 300   // new spots must be ≥300m from any existing spot
 ---
 
 ## Change Log
+
+### 2026-05-13 (session 18) — Performance, stability, leaderboard fixes, spot wipe
+
+**App crash fix (`src/context/SpotsContext.jsx`):**
+- Root cause: `useState(SPOTS_SEED)` still referenced `SPOTS_SEED` after the import was removed in session 17
+- Fix: `useState([])` — spots now start empty and populate from Firestore `onSnapshot`
+- `loading` starts as `true` (was `false`) so the splash screen shows until the first snapshot arrives
+- Auto-seed code (`syncSeeds()`) removed entirely — the one-time seed has already run; removing it prevents any re-population after an intentional spot wipe
+- `MAX_CHECKINS_PER_HOUR` constant removed (was unused)
+- Unused imports (`setDoc`, `orderBy`, `writeBatch`, `SPOTS_SEED`) cleaned up
+
+**Stale check-in on deleted spot fix (`src/context/SpotsContext.jsx`):**
+- Root cause: after wiping all spots, `users/{uid}.activeCheckin` still pointed to a deleted spot ID; on next launch `restore()` set `checkedInId` to that ghost ID; on next check-in the code tried to decrement counters on the deleted spot → Firestore rule evaluated with `resource.data = null` → "Missing or insufficient permissions"
+- Fix 1: `restore()` now verifies the saved spot still exists (`getDoc`) before restoring `checkedInId`; if the spot is gone, clears `activeCheckin: null` on the user document
+- Fix 2: the "leave previous spot" decrement block is now wrapped in its own try-catch so a deleted spot ID never aborts the whole check-in
+
+**Firestore rules — users collection (`firestore.rules`):**
+- Changed `allow read, write: if isOwner(uid) || isAdmin()` → `allow read: if isSignedIn(); allow write: if isOwner(uid) || isAdmin()`
+- Previous rule blocked the leaderboard query (`getDocs` on all users ordered by points); the `.catch(() => {})` silently ate the error and returned an empty array
+- Deployed via `firebase deploy --only firestore:rules`
+
+**Leaderboard always visible (`src/screens/DiscoverScreen.jsx`):**
+- Removed `{leaderboard.length > 0 && ...}` conditional — section always renders
+- Added empty-state: "No explorers yet — be the first to check in!" when `leaderboard.length === 0`
+- Moved leaderboard to top of Explore tab (first section below search bar)
+
+**Branded splash/loading screen (`src/components/Loading.jsx`):**
+- Replaced generic spinner+text with dark branded screen: "EgySpots" + "Cairo's live map" + small spinner
+- Background: `#0D0B14`, text: `#EDE9F8`, tagline: `#A78BFA` — matches app dark theme
+- `useTheme()` dependency removed (splash renders before theme context is ready)
+
+**GPS energy reduction (`src/App.jsx`):**
+- `maximumAge: 15000 → 45000` — iOS can now serve cached position for up to 45s, reducing GPS/cell subsystem wake-ups by ~3×
+- `timeout: 20000 → 30000` — gives slower devices more time before giving up on a fresh fix
+
+**Camera speed (`src/screens/AddStoryScreen.jsx`):**
+- Removed redundant `Camera.checkPermissions()` call before `Camera.getPhoto()` — eliminates one synchronous native round-trip; `getPhoto()` handles permission denial itself
+- Quality lowered `85 → 70` — slightly smaller temp file; no visible quality difference at story viewer size
+- Note: the remaining `FigCaptureSourceRemote err=-17281` / `BackWideDual` warnings in Xcode console are iOS-level AVCaptureSession initialization on dual-lens hardware — not fixable from JS; camera is faster on subsequent opens after first cold launch
+
+**Story photo upload (`src/screens/AddStoryScreen.jsx`):**
+- `compressImage()` helper added (outside component): draws photo to canvas at max 1280px wide, re-encodes at 75% JPEG — typical 3 MB iPhone photo → ~250 KB; upload is ~10× faster
+- `nativePath` state tracks Capacitor Camera `webPath`; preview shown immediately without fetch; fetch + compress happens only at submit time
+- Gallery file size limit raised 5 MB → 30 MB (compression handles reduction)
+
+**Spot wipe:**
+- All seed spots deleted from Firestore via `firebase firestore:delete --project egyspots-dc9c1 --recursive --force /spots`
+- Auto-seed removed from code — spots added going forward are real user-created spots only
+
+**App Store version bump:**
+- Version must be incremented in Xcode (General → Identity) before each new submission
+- `CFBundleShortVersionString` (Version): `1.0` → `1.1` for next upload
+- `CFBundleVersion` (Build): increment by 1 each archive
+
+---
+
+### 2026-05-10 (session 17) — Two-track points system
+
+**New file: `src/utils/points.js`**
+- Pure point-logic functions with no Firestore dependency (fully unit-testable)
+- Exports: `EXPLORER_FIRST_VISIT(10)`, `EXPLORER_REPEAT_VISIT(2)`, `EXPLORER_POST_STORY(5)`, `EXPLORER_FIRST_SPOT_CHECKIN(20)`, `FOUNDER_CHECKIN(5)`, `FOUNDER_STORY(3)`, `FOUNDER_MILESTONE(50)`, `MILESTONE_THRESHOLDS([10,50,100])`
+- `explorerCheckinPts(isFirstVisit)` → 10 or 2
+- `isMilestone(newTotalCheckins)` → true at exactly 10, 50, or 100
+- `shouldAwardFounder(founderId, actingUserId)` → false for self or null founder
+- `computeCheckinPoints({ userId, founderId, prevTotalCheckins, isFirstVisit })` → `{ uid → delta }` map
+- `computeStoryPoints({ userId, founderId })` → `{ uid → delta }` map
+
+**New file: `src/test/points.test.js`** — 19 tests covering all edge cases:
+- First vs repeat visit explorer points
+- Milestone detection (true at thresholds, false at ±1 and arbitrary values)
+- Self-checkin exclusion (founder gets only explorer pts, never founder pts from own checkin)
+- Milestone fires even on self-checkin
+- First-ever check-in bonus (`prevTotalCheckins === 0`) awards `EXPLORER_FIRST_SPOT_CHECKIN` to founder
+- No founderId case: only acting user receives pts
+
+**`src/context/SpotsContext.jsx`** — check-in path updated:
+- Added `isFirstVisit` query before writing checkin doc
+- `computeCheckinPoints()` called after checkin written; fire-and-forget `updateDoc` per uid
+
+**`src/screens/AddStoryScreen.jsx`** — story post path updated:
+- Added `updateDoc`, `doc`, `increment` to Firestore imports
+- `computeStoryPoints()` called after story `addDoc` succeeds; fire-and-forget `updateDoc` per uid
+
+**`src/screens/ProfileScreen.jsx`** — stats row:
+- Added 4th stat: `{ label: 'Points', value: userProfile?.points || 0 }`
+- Grid changed from `repeat(3,1fr)` → `repeat(4,1fr)`
+
+**`src/screens/DiscoverScreen.jsx`** — leaderboard:
+- Added `useEffect` + `leaderboard` state; Firestore query `orderBy('points','desc'), limit(10)` on mount
+- "Top Explorers" section renders 🥇🥈🥉 for top 3, `#N` for rest; avatar + display name + check-in count + points badge
+
+---
+
+### 2026-05-07 (session 16) — In-app tutorial (coach marks) + story UX overhaul + GPS battery fix
+
+**In-app coach marks tour (`src/components/TourOverlay.jsx`):**
+- Shows once after onboarding completes — stored in `localStorage.tourDone`
+- 4 steps: FAB → Explore tab → Stories tab → Done
+- Spotlight via CSS `box-shadow: 0 0 0 9999px rgba(0,0,0,0.82)` on a positioned div — no canvas, no SVG
+- Progress dots, step title, body text, Next + Skip buttons
+- Tooltip positioned above bottom-nav elements automatically via `getBoundingClientRect()`
+- IDs added to DOM: `id="tour-fab"` (FAB button), `id="tour-explore"` (Explore tab), `id="tour-stories"` (Stories tab)
+- `TourOverlay` renders inside the main App return (not as a conditional overlay screen) so the real UI is visible behind the spotlight
+
+**Story viewer UX overhaul (`src/screens/StoryViewerScreen.jsx`):**
+- Progress bar: replaced `setInterval`+`setState` with CSS `animation: storyProgress` — GPU composited, zero JS re-renders during playback
+- Auto-advance: single `setTimeout` instead of polling interval
+- All story images preloaded on viewer open (not just next)
+- Hold-to-pause: touchstart > 150ms → `animationPlayState: paused`; release → resumes
+- User profile photo shown in top bar (was initials-only before)
+- Removed `progress` state and `intervalRef`
+
+**StoriesTab skeleton loading:** replaced "Loading…" text with shimmer skeleton rings + cards
+**CSS additions (`src/index.css`):** `@keyframes storyProgress`, `@keyframes shimmer`, `.shimmer` class
+
+**GPS battery drain fix (`src/App.jsx`):** `enableHighAccuracy: false` (was `true`) — uses cell/WiFi location; sufficient for 200m radius, doesn't run GPS chip continuously
+**Story upload timeout (`src/screens/AddStoryScreen.jsx`):** `Promise.race` with 30s timeout; shows "Upload timed out" instead of infinite spinner
+
+**Onboarding content fixed (`src/screens/OnboardingScreen.jsx`):** slide 3 updated from old "Follow vendors" copy to accurate "Stories disappear in 6 hours" content
+
+---
+
+### 2026-05-07 (session 15) — App Store approved, app is live
+
+- **App Store Connect listing** completed: description, keywords, screenshots (6.7" + 5.5"), age rating, export compliance
+- **Demo reviewer account** created and added to App Review Notes
+- **App approved and live** on the App Store: `https://apps.apple.com/us/app/egyspots/id6766826786`
+
+---
 
 ### 2026-05-07 (session 14) — App Store link live + full GitHub push
 

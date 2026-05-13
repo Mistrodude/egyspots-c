@@ -47,6 +47,7 @@ export default function ProfileScreen({ onNavigateToAuth, onEditProfile, onSetti
     { label: 'Check-ins', value: userProfile?.totalCheckins || 0 },
     { label: 'Founded', value: founded.length },
     { label: 'Stories', value: myStories.length },
+    { label: 'Points', value: userProfile?.points || 0 },
   ];
 
   return (
@@ -75,7 +76,7 @@ export default function ProfileScreen({ onNavigateToAuth, onEditProfile, onSetti
           <button onClick={onNotifications} style={pillBtn(t)}><BellIcon color={t.text} size={14} /> {unreadCount > 0 ? `(${unreadCount})` : ''}</button>
           <button onClick={toggleTheme} style={pillBtn(t)}>{isDark ? 'Dark' : 'Light'}</button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', marginTop: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', marginTop: 10 }}>
           {stats.map((s) => <div key={s.label} style={{ textAlign: 'center' }}><div style={{ color: t.accent, fontSize: 16, fontWeight: 800 }}>{s.value}</div><div style={{ color: t.muted, fontSize: 10 }}>{s.label}</div></div>)}
         </div>
         </div>

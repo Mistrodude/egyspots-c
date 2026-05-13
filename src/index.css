@@ -54,7 +54,16 @@ html, body, #root {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+@keyframes storyProgress {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@keyframes shimmer {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
 
 .anim-fadeUp  { animation: fadeUp 0.3s ease both; }
 .anim-slideInRight { animation: slideInRight 0.3s cubic-bezier(.32,1,.36,1) both; }
 .anim-slideInUp    { animation: slideInUp 0.4s cubic-bezier(.32,1,.36,1) both; }
+.shimmer { animation: shimmer 1.4s ease-in-out infinite; }

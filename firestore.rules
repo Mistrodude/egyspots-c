@@ -50,9 +50,11 @@ service cloud.firestore {
       }
     }
 
-    // Users: owner or admin only.
+    // Users: any signed-in user can read (needed for leaderboard + check-in feeds).
+    //        Only the owner or admin can write.
     match /users/{uid} {
-      allow read, write: if isOwner(uid) || isAdmin();
+      allow read: if isSignedIn();
+      allow write: if isOwner(uid) || isAdmin();
     }
 
     // Check-ins: public read; auth users create own; owner delete.

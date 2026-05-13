@@ -5,6 +5,7 @@ import { useAuth }   from './context/AuthContext';
 import { useSpots }  from './context/SpotsContext';
 import BottomNav     from './components/BottomNav';
 import Loading       from './components/Loading';
+import TourOverlay   from './components/TourOverlay';
 import ExploreScreen from './screens/ExploreScreen';
 
 const SpotDetailScreen    = lazy(() => import('./screens/SpotDetailScreen'));
@@ -47,6 +48,14 @@ export default function App() {
   const [onboardingDone, setOnboardingDone] = useState(
     () => localStorage.getItem('onboardingDone') === 'true'
   );
+  const [tourActive, setTourActive] = useState(false);
+
+  // Show the tour once — after onboarding completes, for users who haven't seen it yet
+  useEffect(() => {
+    if (onboardingDone && localStorage.getItem('tourDone') !== 'true') {
+      setTourActive(true);
+    }
+  }, [onboardingDone]);
 
   const [userPos,    setUserPos]    = useState(null);
   const [nearbySpot, setNearbySpot] = useState(null);
@@ -57,13 +66,13 @@ export default function App() {
   useEffect(() => { checkInRef.current = checkIn; });
   useEffect(() => { checkedInIdRef.current = checkedInId; });
 
-  // Watch GPS position continuously — low accuracy to save battery
+  // Watch GPS position continuously — cell/wifi accuracy is enough for 200m radius
   useEffect(() => {
     if (!navigator.geolocation) return;
     const watchId = navigator.geolocation.watchPosition(
       (pos) => setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       () => {},
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+      { enableHighAccuracy: false, maximumAge: 45000, timeout: 30000 }
     );
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
@@ -301,6 +310,12 @@ export default function App() {
         }}>
           {toast}
         </div>
+      )}
+      {tourActive && (
+        <TourOverlay onDone={() => {
+          localStorage.setItem('tourDone', 'true');
+          setTourActive(false);
+        }} />
       )}
     </div>
   );

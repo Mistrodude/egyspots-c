@@ -12,14 +12,34 @@ export default function StoryViewerScreen({ spotId, initialIndex = 0, onClose, o
   const { storiesBySpot, markViewed } = useStories();
   const { user } = useAuth();
   const stories = storiesBySpot[spotId] || [];
+
   const [idx,          setIdx]          = useState(initialIndex);
   const [paused,       setPaused]       = useState(false);
-  const [progress,     setProgress]     = useState(0);
   const [imageLoaded,  setImageLoaded]  = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
-  const intervalRef   = useRef(null);
+
   const touchStartRef = useRef({ x: 0, y: 0, time: 0 });
-  const current = stories[idx];
+  const holdRef       = useRef(null);
+  const timerRef      = useRef(null);
+  const viewedRef     = useRef(new Set());
+  const current       = stories[idx];
+
+  // Preload every story image the moment the viewer opens
+  useEffect(() => {
+    stories.forEach((s) => { if (s.photoURL) new Image().src = s.photoURL; });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset loaded flag when the story changes
+  useEffect(() => {
+    setImageLoaded(!current?.photoURL);
+  }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mark viewed once per story (not on every render)
+  useEffect(() => {
+    if (!imageLoaded || !current || viewedRef.current.has(current.id)) return;
+    viewedRef.current.add(current.id);
+    markViewed(current.id);
+  }, [idx, imageLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const advance = useCallback(() => {
     setIdx((i) => {
@@ -27,36 +47,14 @@ export default function StoryViewerScreen({ spotId, initialIndex = 0, onClose, o
       onClose();
       return i;
     });
-    setProgress(0);
   }, [stories.length, onClose]);
 
-  // Reset loaded state and preload next image whenever story changes
+  // Auto-advance via setTimeout — no setInterval, zero re-renders during playback
   useEffect(() => {
-    setImageLoaded(!current?.photoURL); // no URL = instantly "loaded"
-    setProgress(0);
-    const next = stories[idx + 1];
-    if (next?.photoURL) {
-      const img = new Image();
-      img.src = next.photoURL;
-    }
-  }, [idx]);
-
-  // Progress timer — only runs once image is ready
-  useEffect(() => {
-    if (!current || paused || !imageLoaded) return;
-    markViewed(current.id);
-    const start = Date.now();
-    intervalRef.current = setInterval(() => {
-      const elapsed = Date.now() - start;
-      const pct = Math.min((elapsed / STORY_DURATION) * 100, 100);
-      setProgress(pct);
-      if (pct >= 100) {
-        clearInterval(intervalRef.current);
-        advance();
-      }
-    }, 50);
-    return () => clearInterval(intervalRef.current);
-  }, [idx, paused, imageLoaded, current, advance, markViewed]);
+    if (!imageLoaded || paused || !current) return;
+    timerRef.current = setTimeout(advance, STORY_DURATION);
+    return () => clearTimeout(timerRef.current);
+  }, [idx, imageLoaded, paused, advance, current]);
 
   if (!current) { onClose(); return null; }
 
@@ -70,15 +68,18 @@ export default function StoryViewerScreen({ spotId, initialIndex = 0, onClose, o
 
   const handleTouchStart = (e) => {
     touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() };
+    holdRef.current = setTimeout(() => setPaused(true), 150);
   };
 
   const handleTouchEnd = (e) => {
+    clearTimeout(holdRef.current);
+    if (paused) { setPaused(false); return; } // release hold = unpause
     const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
     const dy = e.changedTouches[0].clientY - touchStartRef.current.y;
     const dt = Date.now() - touchStartRef.current.time;
     if (dy > 80 && Math.abs(dy) > Math.abs(dx)) {
       onClose();
-    } else if (dt < 300 && Math.abs(dx) < 20 && Math.abs(dy) < 20) {
+    } else if (dt < 200 && Math.abs(dx) < 15 && Math.abs(dy) < 15) {
       if (touchStartRef.current.x < window.innerWidth / 2) setIdx((i) => Math.max(0, i - 1));
       else advance();
     }
@@ -90,78 +91,111 @@ export default function StoryViewerScreen({ spotId, initialIndex = 0, onClose, o
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Photo */}
+      {/* Gradient placeholder shown while image loads */}
+      {current.photoURL && !imageLoaded && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+        }} />
+      )}
+
+      {/* Story photo — fades in once loaded */}
       {current.photoURL
         ? <img
             key={current.id}
             src={current.photoURL}
             alt=""
             onLoad={() => setImageLoaded(true)}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: imageLoaded ? 1 : 0, transition: 'opacity 0.2s' }}
+            style={{
+              position: 'absolute', inset: 0,
+              width: '100%', height: '100%', objectFit: 'cover',
+              opacity: imageLoaded ? 1 : 0,
+              transition: 'opacity 0.2s ease',
+            }}
           />
         : <div style={{ position: 'absolute', inset: 0, background: t.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48 }}>📍</div>
       }
 
-      {/* Loading spinner — shown until image is ready */}
-      {current.photoURL && !imageLoaded && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#111' }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: '50%',
-            border: '3px solid rgba(255,255,255,0.15)',
-            borderTopColor: 'white',
-            animation: 'spin 0.7s linear infinite',
-          }} />
-        </div>
-      )}
+      {/* Cinematic gradient overlay */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 30%, transparent 55%, rgba(0,0,0,0.8) 100%)',
+      }} />
 
-      {/* Dark overlay */}
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.7) 100%)' }} />
-
-      {/* Progress bars */}
-      <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 44px) + 8px)', left: 12, right: 12, display: 'flex', gap: 3, zIndex: 10 }}>
+      {/* Progress bars — GPU-composited CSS animation, zero JS re-renders */}
+      <div style={{
+        position: 'absolute',
+        top: 'calc(env(safe-area-inset-top, 44px) + 8px)',
+        left: 12, right: 12,
+        display: 'flex', gap: 3,
+        zIndex: 10, pointerEvents: 'none',
+      }}>
         {stories.map((_, i) => (
-          <div key={i} style={{ flex: 1, height: 2.5, background: 'rgba(255,255,255,0.3)', borderRadius: 2, overflow: 'hidden' }}>
-            <div style={{
-              height: '100%', background: 'white', borderRadius: 2,
-              width: i < idx ? '100%' : i === idx ? `${progress}%` : '0%',
-              transition: i === idx ? 'none' : 'none',
-            }} />
+          <div key={i} style={{ flex: 1, height: 2.5, background: 'rgba(255,255,255,0.28)', borderRadius: 2, overflow: 'hidden' }}>
+            {i < idx && (
+              <div style={{ height: '100%', width: '100%', background: 'white', borderRadius: 2 }} />
+            )}
+            {i === idx && (
+              <div
+                key={idx}
+                style={{
+                  height: '100%', width: '100%', background: 'white', borderRadius: 2,
+                  transformOrigin: 'left center',
+                  transform: 'scaleX(0)',
+                  animation: `storyProgress ${STORY_DURATION}ms linear forwards`,
+                  animationPlayState: (paused || !imageLoaded) ? 'paused' : 'running',
+                }}
+              />
+            )}
           </div>
         ))}
       </div>
 
       {/* Top bar */}
-      <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 44px) + 22px)', left: 12, right: 12, display: 'flex', alignItems: 'center', gap: 8, zIndex: 10 }}>
-        <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'white' }}>
-          {(current.userName || '?')[0].toUpperCase()}
+      <div style={{
+        position: 'absolute',
+        top: 'calc(env(safe-area-inset-top, 44px) + 22px)',
+        left: 12, right: 12,
+        display: 'flex', alignItems: 'center', gap: 8, zIndex: 10,
+      }}>
+        {current.userPhotoURL
+          ? <img src={current.userPhotoURL} alt="" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid rgba(255,255,255,0.4)' }} />
+          : <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: 'white', flexShrink: 0 }}>
+              {(current.userName || '?')[0].toUpperCase()}
+            </div>
+        }
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'white', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{current.userName || 'Anonymous'}</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{timeAgo(current.createdAt)}</div>
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'white' }}>{current.userName || 'Anonymous'}</div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>{timeAgo(current.createdAt)}</div>
-        </div>
-        <button onClick={() => setReportTarget(current.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-          <ReportFlagIcon color="rgba(255,255,255,0.7)" size={18} />
+        {paused && (
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', fontWeight: 800, letterSpacing: 1.5, marginRight: 4 }}>HOLD</div>
+        )}
+        <button onClick={() => setReportTarget(current.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, flexShrink: 0 }}>
+          <ReportFlagIcon color="rgba(255,255,255,0.65)" size={18} />
         </button>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, flexShrink: 0 }}>
           <XIcon color="white" size={22} />
         </button>
       </div>
 
       {/* Caption */}
       {current.caption && (
-        <div style={{ position: 'absolute', bottom: 90, left: 16, right: 16, zIndex: 10 }}>
-          <div style={{ fontSize: 14, color: 'white', fontWeight: 500, textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>{current.caption}</div>
+        <div style={{ position: 'absolute', bottom: 108, left: 16, right: 16, zIndex: 10 }}>
+          <div style={{ fontSize: 15, color: 'white', fontWeight: 500, lineHeight: 1.45, textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>
+            {current.caption}
+          </div>
         </div>
       )}
 
       {/* Check-in CTA */}
-      <div style={{ position: 'absolute', bottom: 32, left: 16, right: 16, zIndex: 10 }}>
+      <div style={{ position: 'absolute', bottom: 40, left: 16, right: 16, zIndex: 10 }}>
         <button
-          onClick={() => { setPaused(true); onCheckIn(); }}
+          onClick={() => { clearTimeout(timerRef.current); setPaused(true); onCheckIn(); }}
           style={{
-            width: '100%', padding: '13px 0', borderRadius: 14,
+            width: '100%', padding: '14px 0', borderRadius: 14,
             background: t.accent, color: 'white', border: 'none',
-            fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: 14, cursor: 'pointer',
+            fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: 15, cursor: 'pointer',
           }}
         >
           Check In Here

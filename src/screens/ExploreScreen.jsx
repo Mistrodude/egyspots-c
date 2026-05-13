@@ -164,7 +164,7 @@ export default function ExploreScreen({ onSpotPress, onOpenSearch, onAddSpot, us
           </svg>
         </button>
 
-        <button onClick={onAddSpot} title="Create a new spot" style={{
+        <button id="tour-add-spot" onClick={onAddSpot} title="Create a new spot" style={{
           width: 40, height: 40, borderRadius: '50%',
           border: `1px solid ${t.border}`, cursor: 'pointer',
           background: 'rgba(21,18,30,0.9)', backdropFilter: 'blur(12px)',

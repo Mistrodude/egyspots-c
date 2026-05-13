@@ -1,23 +1,21 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  collection, onSnapshot, doc, updateDoc, setDoc,
-  addDoc, getDoc, getDocs, serverTimestamp, increment, query, where, orderBy, limit,
-  writeBatch,
+  collection, onSnapshot, doc, updateDoc,
+  addDoc, getDoc, getDocs, serverTimestamp, increment, query, where, limit,
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { SPOTS_SEED } from '../data/spots';
 import { useAuth } from './AuthContext';
+import { computeCheckinPoints } from '../utils/points';
 
 const SpotsContext = createContext(null);
 
-const MAX_CHECKINS_PER_HOUR = 5;
 const CHECKIN_COOLDOWN_MINUTES = 5;
 
 export function SpotsProvider({ children }) {
   const { user, userProfile } = useAuth();
-  const [spots,       setSpots]       = useState(SPOTS_SEED);
+  const [spots,       setSpots]       = useState([]);
   const [checkedInId, setCheckedInId] = useState(null);
-  const [loading,     setLoading]     = useState(false); // SPOTS_SEED pre-loaded; Firestore updates in background
+  const [loading,     setLoading]     = useState(true);
   const [checkinHistory, setCheckinHistory] = useState([]);
 
   // Refs so checkIn callback never goes stale without needing spots/checkinHistory in its deps
@@ -25,25 +23,6 @@ export function SpotsProvider({ children }) {
   const checkinHistoryRef = useRef(checkinHistory);
   useEffect(() => { spotsRef.current = spots; },          [spots]);
   useEffect(() => { checkinHistoryRef.current = checkinHistory; }, [checkinHistory]);
-
-  // Seed spot documents on first deploy only
-  useEffect(() => {
-    if (!user || localStorage.getItem('spots_seeded')) return;
-    const syncSeeds = async () => {
-      try {
-        const snap = await getDocs(collection(db, 'spots'));
-        if (snap.empty) {
-          const batch = writeBatch(db);
-          SPOTS_SEED.forEach((s) => {
-            batch.set(doc(db, 'spots', s.id), { ...s, createdAt: serverTimestamp() });
-          });
-          await batch.commit();
-        }
-        localStorage.setItem('spots_seeded', '1');
-      } catch (_) {}
-    };
-    syncSeeds();
-  }, [user]);
 
   // Real-time spots listener
   useEffect(() => {
@@ -71,7 +50,15 @@ export function SpotsProvider({ children }) {
       try {
         const snap = await getDoc(doc(db, 'users', user.uid));
         if (snap.exists() && snap.data().activeCheckin) {
-          setCheckedInId(snap.data().activeCheckin);
+          const savedId = snap.data().activeCheckin;
+          // Verify the spot still exists before restoring the check-in
+          const spotSnap = await getDoc(doc(db, 'spots', savedId));
+          if (spotSnap.exists()) {
+            setCheckedInId(savedId);
+          } else {
+            // Spot was deleted — clear the stale activeCheckin
+            updateDoc(doc(db, 'users', user.uid), { activeCheckin: null }).catch(() => {});
+          }
         }
       } catch (_) {}
     };
@@ -117,17 +104,32 @@ export function SpotsProvider({ children }) {
     if (!user) return { success: true, optimistic: true };
 
     try {
-      // Leave previous spot
+      // Leave previous spot — silently ignore if that spot was deleted
       if (!isLeaving && checkedInId) {
-        await updateDoc(doc(db, 'spots', checkedInId), {
-          checkins:     increment(-1),
-          totalCheckins: increment(-1),
-          checkinsToday: increment(-1),
-        });
+        try {
+          await updateDoc(doc(db, 'spots', checkedInId), {
+            checkins:     increment(-1),
+            totalCheckins: increment(-1),
+            checkinsToday: increment(-1),
+          });
+        } catch (_) {}
       }
 
       if (!isLeaving) {
         const spot = currentSpots.find((s) => s.id === spotId);
+
+        // Determine first-visit status (needed for explorer points)
+        let isFirstVisit = true;
+        try {
+          const prevSnap = await getDocs(
+            query(collection(db, 'checkins'),
+              where('userId', '==', user.uid),
+              where('spotId', '==', spotId),
+              limit(1)
+            )
+          );
+          isFirstVisit = prevSnap.empty;
+        } catch (_) {}
 
         // Write checkin document
         const checkinData = {
@@ -161,14 +163,25 @@ export function SpotsProvider({ children }) {
         }
 
         await updateDoc(doc(db, 'spots', spotId), {
-          checkins:     increment(1),
+          checkins:      increment(1),
           totalCheckins: increment(1),
           checkinsToday: increment(1),
         });
 
         await updateDoc(doc(db, 'users', user.uid), {
-          activeCheckin:  newId,
-          totalCheckins:  increment(1),
+          activeCheckin: newId,
+          totalCheckins: increment(1),
+        });
+
+        // Award points — fire-and-forget so they never block the check-in UX
+        const ptsByUid = computeCheckinPoints({
+          userId:            user.uid,
+          founderId:         spot?.founderId || null,
+          prevTotalCheckins: spot?.totalCheckins || 0,
+          isFirstVisit,
+        });
+        Object.entries(ptsByUid).forEach(([uid, pts]) => {
+          updateDoc(doc(db, 'users', uid), { points: increment(pts) }).catch(() => {});
         });
       } else {
         await updateDoc(doc(db, 'spots', spotId), {
